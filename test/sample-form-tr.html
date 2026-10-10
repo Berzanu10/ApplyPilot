@@ -63,6 +63,19 @@
       </div>
       <div class="row">
         <div class="form-group">
+          <label for="ingilizce">İngilizce Seviyeniz</label>
+          <select id="ingilizce" data-state="ingilizce">
+            <option value="">Seçiniz</option>
+            <option value="a1">A1 – Başlangıç</option>
+            <option value="a2">A2 – Temel</option>
+            <option value="b1">B1 – Orta</option>
+            <option value="b2">B2 – Orta üstü</option>
+            <option value="c1">C1 – İleri</option>
+            <option value="c2">C2 – Ustalık</option>
+            <option value="native">Ana dil</option>
+          </select>
+        </div>
+        <div class="form-group">
           <label for="askerlik">Askerlik Durumu</label>
           <select id="askerlik" data-state="askerlik">
             <option value="">Seçiniz</option>
@@ -88,6 +101,7 @@
       <div class="form-group"><label for="onyazi">Ön Yazı</label><textarea id="onyazi" rows="4" data-state="onYazi"></textarea></div>
       <div class="form-group"><label for="hakkimda">Kendinizi kısaca tanıtın</label><textarea id="hakkimda" rows="3" data-state="hakkimda"></textarea></div>
       <div class="form-group"><label for="egitim">Eğitim Bilgileriniz</label><textarea id="egitim" rows="2" data-state="egitim"></textarea></div>
+      <div class="form-group"><label for="cv">Özgeçmiş / CV Yükle</label><input id="cv" type="file" accept=".pdf,.doc,.docx" data-state="cvDosya"></div>
     </section>
 
     <button type="button" id="goster">Form durumunu göster</button>

@@ -78,6 +78,19 @@
         </div>
       </div>
       <div class="field">
+        <label for="english">English proficiency</label>
+        <select id="english" data-state="english">
+          <option value="">Select</option>
+          <option>Beginner</option>
+          <option>Elementary</option>
+          <option>Intermediate</option>
+          <option>Upper-Intermediate</option>
+          <option>Advanced</option>
+          <option>Proficient</option>
+          <option>Native</option>
+        </select>
+      </div>
+      <div class="field">
         <label for="years">Years of experience</label>
         <select id="years" data-state="years">
           <option value="">Select</option>
@@ -93,6 +106,14 @@
           <label><input type="radio" name="work_mode" value="remote" data-state="workMode"> Remote</label>
           <label><input type="radio" name="work_mode" value="hybrid" data-state="workMode"> Hybrid</label>
           <label><input type="radio" name="work_mode" value="onsite" data-state="workMode"> On-site</label>
+        </div>
+      </div>
+      <div class="field">
+        <div class="q">Which work models can you do? (select all that apply)</div>
+        <div>
+          <label><input type="checkbox" name="work_ok[]" value="onsite" data-state="workOkOnsite"> On-site</label>
+          <label><input type="checkbox" name="work_ok[]" value="hybrid" data-state="workOkHybrid"> Hybrid</label>
+          <label><input type="checkbox" name="work_ok[]" value="remote" data-state="workOkRemote"> Remote</label>
         </div>
       </div>
       <div class="field">
@@ -116,6 +137,7 @@
       <legend>Tell us about you</legend>
       <div class="field"><label for="summary">Professional summary</label><textarea id="summary" rows="3" data-state="summary"></textarea></div>
       <div class="field"><span class="q" id="cl-label">Cover Letter</span><div class="editor" contenteditable="true" role="textbox" aria-labelledby="cl-label" data-state="coverLetter"></div></div>
+      <div class="field"><label for="resume">Upload resume / CV</label><input id="resume" type="file" accept=".pdf,.doc,.docx" data-state="resumeFile"></div>
       <div class="field"><label for="extra">Additional information</label><textarea id="extra" rows="2" data-state="extra"></textarea></div>
       <label><input type="checkbox" name="privacy" data-state="privacy"> I agree to the privacy policy</label>
     </fieldset>

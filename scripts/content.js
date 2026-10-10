@@ -7,7 +7,7 @@
 (() => {
   'use strict';
 
-  const ENGINE_VERSION = '1.0.0';
+  const ENGINE_VERSION = '1.1.0';
   const extensionAPI = typeof browser !== 'undefined' ? browser : (typeof chrome !== 'undefined' ? chrome : null);
 
   if (globalThis.__ApplyPilotEngine && globalThis.__ApplyPilotEngine.version === ENGINE_VERSION) {
@@ -113,6 +113,44 @@
       en: 'On-site',
       synonyms: ['on site', 'onsite', 'ofisten', 'ofis', 'office', 'in office', 'in person', 'yerinde', 'isyerinde', 'office based'],
       detect: /\bon ?site\b|\bofisten\b|\bofis\b|\boffice\b|in person|\byerinde\b/
+    }
+  };
+
+  const ENGLISH_LEVELS = {
+    native: {
+      tr: 'Ana dil',
+      en: 'Native',
+      synonyms: ['native', 'ana dil', 'anadil', 'mother tongue', 'native speaker', 'bilingual', 'iki dilli']
+    },
+    c2: {
+      tr: 'C2 – Ustalık',
+      en: 'C2 – Proficient',
+      synonyms: ['c2', 'proficient', 'proficiency', 'mastery', 'full professional', 'ustalik', 'cok iyi', 'çok iyi']
+    },
+    c1: {
+      tr: 'C1 – İleri',
+      en: 'C1 – Advanced',
+      synonyms: ['c1', 'advanced', 'ileri', 'fluent', 'akici', 'akıcı', 'professional working', 'ileri seviye']
+    },
+    b2: {
+      tr: 'B2 – Orta üstü',
+      en: 'B2 – Upper-Intermediate',
+      synonyms: ['b2', 'upper intermediate', 'upper-intermediate', 'ortaustu', 'orta ustu', 'orta üstü', 'good']
+    },
+    b1: {
+      tr: 'B1 – Orta',
+      en: 'B1 – Intermediate',
+      synonyms: ['b1', 'intermediate', 'orta', 'orta seviye']
+    },
+    a2: {
+      tr: 'A2 – Temel',
+      en: 'A2 – Elementary',
+      synonyms: ['a2', 'elementary', 'pre intermediate', 'temel', 'temel seviye']
+    },
+    a1: {
+      tr: 'A1 – Başlangıç',
+      en: 'A1 – Beginner',
+      synonyms: ['a1', 'beginner', 'basic', 'baslangic', 'başlangıç']
     }
   };
 
@@ -265,6 +303,11 @@
       patterns: [/\bmilitary\b/, /\baskerlik/, /\baskeri\b/, /\barmy\b/]
     },
     {
+      key: 'englishLevel', category: 'preferences', accepts: SHORT_ACCEPTS,
+      patterns: [/\benglish (level|proficiency|fluency|skill|competenc)/, /\bproficiency in english/, /\bfluency in english/, /\bingilizce (seviye|bilgi|dil)/, /\bingilizce$/, /\bdil seviyesi/, /\blanguage (level|proficiency|skill)/],
+      negatives: [/program|coding|java|python|deutsch|german|french|fransiz|spanish|ispanyol|arabic|arapca|turkce|turkish/]
+    },
+    {
       key: 'requiresSponsorship', category: 'preferences', accepts: CHOICE_ACCEPTS,
       patterns: [/\bsponsor/, /\bvize (destegi|sponsor)/, /\bvisa (support|sponsor)/]
     },
@@ -308,6 +351,11 @@
     {
       key: 'education', category: 'resume', accepts: LONG_ACCEPTS, once: true,
       patterns: [/\beducation/, /\begitim/, /\bacademic/, /\bakademik/, /universit/, /\bschool/, /\bokul/, /\bdegree/, /\bdiploma/, /\bmezun/, /\bogrenim/, /\bqualification/]
+    },
+    {
+      key: 'resumeFile', category: 'documents', accepts: ['file'], once: true,
+      patterns: [/\bcv\b/, /\bresume\b/, /\bozgecmis/, /\bcurriculum/, /\bupload/, /\byukle/, /\battach/, /\bek dosya/, /\bdosya/, /\bdocument\b/, /\bbelge/],
+      negatives: [/cover|on ?yazi|motivasyon|photo|foto|image|resim|portre|picture|avatar|headshot|kimlik|passport|id card|transcript|transkript/]
     },
     {
       key: 'address', category: 'personal', accepts: ['input', 'textarea'], autocomplete: ['street-address', 'address-line1'],
@@ -361,6 +409,7 @@
       const type = String(el.type || 'text').toLowerCase();
       if (type === 'radio') return 'radio';
       if (type === 'checkbox') return 'checkbox';
+      if (type === 'file') return 'file';
       return TEXT_INPUT_TYPES.has(type) ? 'input' : null;
     }
     if (el.isContentEditable && !(el.parentElement && el.parentElement.isContentEditable)) return 'editable';
@@ -379,7 +428,7 @@
     if ((kind === 'input' || kind === 'textarea') && el.readOnly) return false;
     const signature = `${el.getAttribute('name') || ''} ${el.id || ''} ${el.getAttribute('class') || ''}`.toLowerCase();
     if (/captcha|honeypot|\bhp_|bot.?field/.test(signature)) return false;
-    if (kind === 'radio' || kind === 'checkbox') {
+    if (kind === 'radio' || kind === 'checkbox' || kind === 'file') {
       return isVisible(el) || Array.from(el.labels || []).some(isVisible) || isVisible(el.parentElement);
     }
     if (kind === 'select') return isVisible(el) || isVisible(el.parentElement);
@@ -877,22 +926,50 @@
     };
   }
 
-  function resolveWorkMode(ctx) {
-    const mode = pick(ctx, 'career.workMode');
-    const definition = WORK_MODES[mode];
-    if (!definition) return null;
+  function getPreferredWorkModes(ctx) {
+    const raw = ctx.profile && ctx.profile.career && ctx.profile.career.workModes;
+    const list = Array.isArray(raw) ? raw.slice() : [];
+    const legacy = pick(ctx, 'career.workMode');
+    if (!list.length && legacy) list.push(legacy);
+    return unique(list.filter((mode) => WORK_MODES[mode]));
+  }
 
+  function modeChoice(mode, lang) {
+    const definition = WORK_MODES[mode];
+    return {
+      text: definition[lang] || definition.en,
+      candidates: [definition.en, definition.tr, ...definition.synonyms]
+    };
+  }
+
+  function resolveWorkMode(ctx) {
+    const modes = getPreferredWorkModes(ctx);
+    if (!modes.length) return null;
+
+    const rankedChoices = modes.map((mode) => modeChoice(mode, ctx.lang));
     const question = `${ctx.desc.label} ${ctx.desc.placeholder} ${ctx.desc.context}`;
     const mentioned = Object.keys(WORK_MODES).filter((key) => WORK_MODES[key].detect.test(question));
     let bool;
-    if (mentioned.length) bool = mentioned.includes(mode) || mode === 'hybrid';
+    if (mentioned.length) bool = mentioned.some((key) => modes.includes(key));
 
     return {
-      text: definition[ctx.lang] || definition.en,
-      candidates: [definition.en, definition.tr, ...definition.synonyms],
+      text: rankedChoices.map((choice) => choice.text).join(', '),
+      candidates: rankedChoices[0].candidates,
       bool,
-      multi: [mode]
+      multi: modes,
+      rankedChoices
     };
+  }
+
+  function resolveResumeFile(ctx) {
+    const documents = ctx.documents || {};
+    const primary = documents[ctx.lang];
+    const fallback = ctx.settings.fallbackToOtherLanguage
+      ? documents[ctx.lang === 'tr' ? 'en' : 'tr']
+      : null;
+    const doc = primary && primary.bytes ? primary : (fallback && fallback.bytes ? fallback : null);
+    if (!doc) return null;
+    return { file: doc };
   }
 
   function resolveNotice(ctx) {
@@ -931,6 +1008,12 @@
     const status = MILITARY_STATUSES[pick(ctx, 'career.militaryStatus')];
     if (!status) return null;
     return { text: status[ctx.lang] || status.en, candidates: [status.tr, status.en, ...status.synonyms] };
+  }
+
+  function resolveEnglishLevel(ctx) {
+    const level = ENGLISH_LEVELS[pick(ctx, 'career.englishLevel')];
+    if (!level) return null;
+    return { text: level[ctx.lang] || level.en, candidates: [level.tr, level.en, ...level.synonyms] };
   }
 
   function resolveWorkAuthorization(ctx) {
@@ -975,18 +1058,20 @@
     workMode: resolveWorkMode,
     noticePeriod: resolveNotice,
     militaryStatus: resolveMilitary,
+    englishLevel: resolveEnglishLevel,
     workAuthorization: resolveWorkAuthorization,
     requiresSponsorship: (ctx) => yesNoValue(pick(ctx, 'career.requiresSponsorship'), ctx.lang),
     willingToRelocate: (ctx) => yesNoValue(pick(ctx, 'career.willingToRelocate'), ctx.lang),
     coverLetter: (ctx) => textValue(langText(ctx, 'coverLetter')),
     summary: (ctx) => textValue(langText(ctx, 'summary')),
     experience: (ctx) => textValue(langText(ctx, 'experience')),
-    education: (ctx) => textValue(langText(ctx, 'education'))
+    education: (ctx) => textValue(langText(ctx, 'education')),
+    resumeFile: resolveResumeFile
   };
 
   function isEmptyValue(value) {
     if (!value) return true;
-    return !value.text && typeof value.bool !== 'boolean' && !(value.candidates && value.candidates.length);
+    return !value.text && !value.file && typeof value.bool !== 'boolean' && !(value.candidates && value.candidates.length) && !(value.rankedChoices && value.rankedChoices.length);
   }
 
   /* ------------------------------------------------------------------ */
@@ -1195,6 +1280,64 @@
     return text;
   }
 
+  function pickFromRanked(options, value) {
+    if (Array.isArray(value.rankedChoices)) {
+      for (const choice of value.rankedChoices) {
+        const option = pickChoice(options, choice);
+        if (option) return option;
+      }
+    }
+    return pickChoice(options, value);
+  }
+
+  function acceptAllowsFile(accept, name, type) {
+    if (!accept) return true;
+    const tokens = accept.toLowerCase().split(',').map((token) => token.trim()).filter(Boolean);
+    if (!tokens.length) return true;
+    const lowerName = String(name || '').toLowerCase();
+    const lowerType = String(type || '').toLowerCase();
+    const ext = lowerName.includes('.') ? `.${lowerName.split('.').pop()}` : '';
+    if (tokens.some((token) => token === 'image/*' || token.startsWith('image/'))) {
+      const hasDocument = tokens.some((token) =>
+        token === '.pdf' || token.includes('pdf') || token.includes('msword') || token.includes('officedocument') || token === '.doc' || token === '.docx'
+      );
+      if (!hasDocument) return false;
+    }
+    return tokens.some((token) => {
+      if (token === '*/*' || token === 'application/*') return true;
+      if (token.startsWith('.') && ext === token) return true;
+      if (token.endsWith('/*') && lowerType.startsWith(token.slice(0, -1))) return true;
+      return token === lowerType || (token.includes('pdf') && (lowerType.includes('pdf') || ext === '.pdf'));
+    });
+  }
+
+  function setFileValue(el, doc) {
+    if (!doc || !doc.bytes) return 'nodata';
+    const name = doc.name || 'cv.pdf';
+    const type = doc.type || 'application/pdf';
+    if (!acceptAllowsFile(el.accept, name, type)) return 'nomatch';
+    if (typeof DataTransfer !== 'function' || typeof File !== 'function') return 'failed';
+
+    let bytes = doc.bytes;
+    if (!(bytes instanceof ArrayBuffer) && ArrayBuffer.isView(bytes)) {
+      bytes = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+    }
+    if (!(bytes instanceof ArrayBuffer)) return 'failed';
+
+    const file = new File([bytes], name, { type, lastModified: Date.now() });
+    const transfer = new DataTransfer();
+    transfer.items.add(file);
+    focusSafely(el);
+    try {
+      el.files = transfer.files;
+    } catch (_) {
+      return 'failed';
+    }
+    fire(el, 'input', null);
+    finishInteraction(el);
+    return el.files && el.files.length ? 'filled' : 'failed';
+  }
+
   function applyValue(unit, value) {
     switch (unit.kind) {
       case 'input':
@@ -1202,17 +1345,42 @@
         return setTextValue(unit.el, formatForInput(unit.el, value));
       case 'editable':
         return setEditableValue(unit.el, value.text);
+      case 'file':
+        return setFileValue(unit.el, value.file);
       case 'select': {
-        const option = pickChoice(selectOptions(unit.el), value);
+        if (unit.el.multiple && Array.isArray(value.rankedChoices)) {
+          let any = false;
+          for (const choice of value.rankedChoices) {
+            const option = pickChoice(selectOptions(unit.el), choice);
+            if (option) {
+              option.el.selected = true;
+              any = true;
+            }
+          }
+          if (any) {
+            fire(unit.el, 'input', null);
+            finishInteraction(unit.el);
+            return 'filled';
+          }
+        }
+        const option = pickFromRanked(selectOptions(unit.el), value);
         return option ? setSelectValue(unit.el, option) : 'nomatch';
       }
       case 'radio': {
-        const option = pickChoice(unit.options, value);
+        const option = pickFromRanked(unit.options, value);
         return option ? checkInput(option.el) : 'nomatch';
       }
       case 'checkbox':
         return value.bool === true ? checkInput(unit.el) : 'nomatch';
       case 'checkboxGroup': {
+        if (Array.isArray(value.rankedChoices) && value.rankedChoices.length) {
+          let filled = 0;
+          for (const choice of value.rankedChoices) {
+            const option = pickChoice(unit.options, choice);
+            if (option && checkInput(option.el) === 'filled') filled += 1;
+          }
+          if (filled) return 'filled';
+        }
         const option = pickChoice(unit.options, { ...value, bool: undefined });
         return option ? checkInput(option.el) : 'nomatch';
       }
@@ -1243,6 +1411,8 @@
       case 'radio':
       case 'checkboxGroup':
         return unit.elements.some((input) => input.checked);
+      case 'file':
+        return Boolean(el.files && el.files.length);
       default:
         return false;
     }
@@ -1396,7 +1566,7 @@
         continue;
       }
 
-      const ctx = { profile, settings, lang, unit: match.unit, desc: match.desc };
+      const ctx = { profile, settings, lang, unit: match.unit, desc: match.desc, documents: (request && request.documents) || {} };
       let value = null;
       try {
         value = RESOLVERS[match.rule.key](ctx);

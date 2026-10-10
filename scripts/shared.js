@@ -48,9 +48,11 @@
       preferredCurrency: 'TRY',
       salaryPeriod: 'monthly',
       workMode: '',
+      workModes: [],
       noticeAmount: '',
       noticeUnit: '',
       militaryStatus: '',
+      englishLevel: '',
       workAuthorization: '',
       visaDetails: '',
       requiresSponsorship: '',
@@ -67,6 +69,10 @@
       summary: '',
       experience: '',
       education: ''
+    },
+    documents: {
+      tr: { name: '', type: '', size: 0 },
+      en: { name: '', type: '', size: 0 }
     }
   });
 
@@ -79,7 +85,8 @@
       salary: true,
       preferences: true,
       coverLetter: true,
-      resume: true
+      resume: true,
+      documents: true
     },
     overwriteExisting: false,
     highlightFields: true,
@@ -117,8 +124,10 @@
     salary: 'Maaş Beklentisi',
     salaryCurrency: 'Para Birimi',
     workMode: 'Çalışma Modu',
+    resumeFile: 'CV Dosyası',
     noticePeriod: 'İhbar Süresi',
     militaryStatus: 'Askerlik',
+    englishLevel: 'İngilizce Seviyesi',
     workAuthorization: 'Çalışma İzni',
     requiresSponsorship: 'Vize Sponsorluğu',
     willingToRelocate: 'Taşınma',
@@ -141,8 +150,10 @@
     ['links.github', 'links.portfolio', 'links.website'],
     ['career.currentTitle'],
     ['career.salaryTRY', 'career.salaryUSD', 'career.salaryEUR'],
-    ['career.workMode'],
+    ['career.workModes', 'career.workMode'],
+    ['documents.tr.name', 'documents.en.name'],
     ['career.noticeUnit'],
+    ['career.englishLevel'],
     ['tr.coverLetter', 'en.coverLetter'],
     ['tr.summary', 'en.summary']
   ];
@@ -168,6 +179,30 @@
     /^https?:\/\/accounts-static\.cdn\.mozilla\.net/i
   ];
 
+  const WORK_MODE_KEYS = Object.freeze(['remote', 'hybrid', 'onsite']);
+  const WORK_MODE_OPTIONS = Object.freeze([
+    { id: 'remote', label: 'Uzaktan (Remote)' },
+    { id: 'hybrid', label: 'Hibrit (Hybrid)' },
+    { id: 'onsite', label: 'Ofisten (On-site)' }
+  ]);
+
+  const DOCUMENT_LANGUAGES = Object.freeze(['tr', 'en']);
+  const MAX_DOCUMENT_BYTES = 8 * 1024 * 1024;
+  const DOCUMENT_ACCEPT = '.pdf,.doc,.docx,.rtf,.odt,.txt,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+  const DOCUMENT_TYPES = Object.freeze({
+    'application/pdf': true,
+    'application/msword': true,
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': true,
+    'application/rtf': true,
+    'text/rtf': true,
+    'application/vnd.oasis.opendocument.text': true,
+    'text/plain': true
+  });
+  const DOCUMENT_EXTENSIONS = Object.freeze(['pdf', 'doc', 'docx', 'rtf', 'odt', 'txt']);
+
+  const IDB_NAME = 'applypilot';
+  const IDB_STORE = 'files';
+
   /* ------------------------------------------------------------------ */
   /* Object helpers                                                      */
   /* ------------------------------------------------------------------ */
@@ -192,6 +227,8 @@
       const overrideValue = isPlainObject(override) ? override[key] : undefined;
       if (isPlainObject(baseValue)) {
         output[key] = mergeDeep(baseValue, isPlainObject(overrideValue) ? overrideValue : {});
+      } else if (Array.isArray(baseValue)) {
+        output[key] = Array.isArray(overrideValue) ? overrideValue.slice() : baseValue.slice();
       } else if (overrideValue !== undefined && overrideValue !== null && typeof overrideValue === typeof baseValue) {
         output[key] = overrideValue;
       } else if (overrideValue !== undefined && overrideValue !== null && typeof baseValue === 'string' && typeof overrideValue === 'number') {
@@ -222,16 +259,37 @@
   /* Storage                                                             */
   /* ------------------------------------------------------------------ */
 
+  function normalizeWorkModes(career) {
+    if (!career || typeof career !== 'object') return [];
+    const incoming = Array.isArray(career.workModes) ? career.workModes.slice() : [];
+    if (!incoming.length && career.workMode) incoming.push(career.workMode);
+    const seen = new Set();
+    const modes = [];
+    for (const mode of incoming) {
+      if (!WORK_MODE_KEYS.includes(mode) || seen.has(mode)) continue;
+      seen.add(mode);
+      modes.push(mode);
+    }
+    career.workModes = modes;
+    career.workMode = modes[0] || '';
+    return modes;
+  }
+
+  function migrateProfile(profile) {
+    normalizeWorkModes(profile.career);
+    return profile;
+  }
+
   async function loadState() {
     const stored = await extensionAPI.storage.local.get([STORAGE_KEYS.profile, STORAGE_KEYS.settings]);
     return {
-      profile: mergeDeep(DEFAULT_PROFILE, stored[STORAGE_KEYS.profile]),
+      profile: migrateProfile(mergeDeep(DEFAULT_PROFILE, stored[STORAGE_KEYS.profile])),
       settings: mergeDeep(DEFAULT_SETTINGS, stored[STORAGE_KEYS.settings])
     };
   }
 
   async function saveProfile(profile) {
-    const clean = mergeDeep(DEFAULT_PROFILE, profile);
+    const clean = migrateProfile(mergeDeep(DEFAULT_PROFILE, profile));
     await extensionAPI.storage.local.set({ [STORAGE_KEYS.profile]: clean });
     return clean;
   }
@@ -269,7 +327,113 @@
 
   async function resetAll() {
     await extensionAPI.storage.local.remove([STORAGE_KEYS.profile, STORAGE_KEYS.settings, STORAGE_KEYS.stats]);
+    await clearDocuments();
     return ensureDefaults();
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* CV / document files (IndexedDB)                                     */
+  /* ------------------------------------------------------------------ */
+
+  function openDocumentDb() {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open(IDB_NAME, 1);
+      request.onupgradeneeded = () => {
+        if (!request.result.objectStoreNames.contains(IDB_STORE)) {
+          request.result.createObjectStore(IDB_STORE);
+        }
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  function idbRequest(request) {
+    return new Promise((resolve, reject) => {
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  function documentKey(lang) {
+    return `cv_${lang}`;
+  }
+
+  function documentMeta(record) {
+    if (!record || !record.name) return { name: '', type: '', size: 0 };
+    return { name: record.name, type: record.type || '', size: Number(record.size) || 0 };
+  }
+
+  async function saveDocument(lang, record) {
+    const db = await openDocumentDb();
+    try {
+      await idbRequest(db.transaction(IDB_STORE, 'readwrite').objectStore(IDB_STORE).put(record, documentKey(lang)));
+    } finally {
+      db.close();
+    }
+  }
+
+  async function getDocument(lang) {
+    const db = await openDocumentDb();
+    try {
+      return (await idbRequest(db.transaction(IDB_STORE, 'readonly').objectStore(IDB_STORE).get(documentKey(lang)))) || null;
+    } finally {
+      db.close();
+    }
+  }
+
+  async function deleteDocument(lang) {
+    const db = await openDocumentDb();
+    try {
+      await idbRequest(db.transaction(IDB_STORE, 'readwrite').objectStore(IDB_STORE).delete(documentKey(lang)));
+    } finally {
+      db.close();
+    }
+  }
+
+  async function clearDocuments() {
+    try {
+      const db = await openDocumentDb();
+      try {
+        await idbRequest(db.transaction(IDB_STORE, 'readwrite').objectStore(IDB_STORE).clear());
+      } finally {
+        db.close();
+      }
+    } catch (_) { /* first run or private mode */ }
+  }
+
+  function toArrayBuffer(bytes) {
+    if (!bytes) return null;
+    if (bytes instanceof ArrayBuffer) return bytes;
+    if (ArrayBuffer.isView(bytes)) {
+      return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+    }
+    return null;
+  }
+
+  async function loadDocumentsForFill() {
+    const documents = {};
+    for (const lang of DOCUMENT_LANGUAGES) {
+      const record = await getDocument(lang);
+      const bytes = record && toArrayBuffer(record.bytes);
+      if (!bytes) continue;
+      documents[lang] = { name: record.name, type: record.type || 'application/pdf', bytes };
+    }
+    return documents;
+  }
+
+  function formatBytes(size) {
+    if (!size) return '';
+    if (size < 1024) return `${size} B`;
+    if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+    return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  function isAllowedDocument(file) {
+    const name = String((file && file.name) || '');
+    const type = String((file && file.type) || '').toLowerCase();
+    const ext = name.includes('.') ? name.split('.').pop().toLowerCase() : '';
+    return DOCUMENT_TYPES[type] || DOCUMENT_EXTENSIONS.includes(ext);
   }
 
   function profileCompleteness(profile) {
@@ -440,10 +604,12 @@
       : await loadState();
     const language = options.language || state.settings.defaultLanguage || 'auto';
 
+    const documents = options.documents || await loadDocumentsForFill();
     const summary = await runEngine(tabId, 'fill', {
       profile: state.profile,
       settings: state.settings,
-      language
+      language,
+      documents
     });
 
     if (summary.ok) {
@@ -477,10 +643,16 @@
     DEFAULT_SETTINGS,
     FIELD_LABELS,
     LANGUAGE_LABELS,
+    WORK_MODE_KEYS,
+    WORK_MODE_OPTIONS,
+    DOCUMENT_LANGUAGES,
+    DOCUMENT_ACCEPT,
+    MAX_DOCUMENT_BYTES,
     clone,
     mergeDeep,
     getPath,
     setPath,
+    normalizeWorkModes,
     loadState,
     saveProfile,
     saveSettings,
@@ -488,6 +660,13 @@
     getStats,
     recordFill,
     resetAll,
+    saveDocument,
+    getDocument,
+    deleteDocument,
+    loadDocumentsForFill,
+    documentMeta,
+    formatBytes,
+    isAllowedDocument,
     profileCompleteness,
     getActiveTab,
     isRestrictedUrl,

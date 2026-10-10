@@ -21,7 +21,8 @@
     fillLanguage: 'auto',
     detectedLanguage: null,
     toastTimer: null,
-    resetTimer: null
+    resetTimer: null,
+    cvPickLang: null
   };
 
   const $ = (selector, root = document) => root.querySelector(selector);
@@ -76,6 +77,11 @@
       const section = $('#importButton').closest('details');
       if (section) section.open = true;
       $('#importButton').scrollIntoView({ block: 'center' });
+    }
+    if (location.hash === '#cv') {
+      const section = $('#cvSection');
+      if (section) section.open = true;
+      section.scrollIntoView({ block: 'center' });
     }
   }
 
@@ -358,6 +364,16 @@
     $('#importFile').addEventListener('change', importData);
     $('#resetButton').addEventListener('click', confirmReset);
 
+    $$('[data-cv-pick]').forEach((button) => {
+      button.addEventListener('click', () => startCvPick(button.dataset.cvPick));
+    });
+    $$('[data-cv-remove]').forEach((button) => {
+      button.addEventListener('click', () => removeCv(button.dataset.cvRemove));
+    });
+    $('#cvFile').addEventListener('change', handleCvPick);
+    $('#workModeList').addEventListener('click', onWorkModeClick);
+    $('#workModeList').addEventListener('change', onWorkModeChange);
+
     window.addEventListener('beforeunload', (event) => {
       if (state.isFullPage && isProfileDirty()) {
         event.preventDefault();
@@ -391,8 +407,134 @@
     });
     $$('textarea[data-counter]').forEach(updateCounter);
     syncNoticeAmount();
+    renderWorkModes();
+    renderCvCards();
     state.savedSnapshot = snapshot();
     updateDirtyState();
+  }
+
+  function getWorkModeOrder() {
+    const selected = Array.isArray(state.profile.career.workModes) ? state.profile.career.workModes.slice() : [];
+    const rest = Shared.WORK_MODE_KEYS.filter((id) => !selected.includes(id));
+    return selected.concat(rest);
+  }
+
+  function renderWorkModes() {
+    const list = $('#workModeList');
+    const selected = new Set(state.profile.career.workModes || []);
+    list.replaceChildren();
+    getWorkModeOrder().forEach((id, index) => {
+      const option = Shared.WORK_MODE_OPTIONS.find((item) => item.id === id);
+      const checked = selected.has(id);
+      const item = document.createElement('li');
+      item.className = `rank-item${checked ? '' : ' is-off'}`;
+      item.dataset.mode = id;
+      item.innerHTML = `
+        <label class="rank-item__check">
+          <input type="checkbox" ${checked ? 'checked' : ''}>
+          <span class="rank-item__badge">${checked ? index + 1 : '—'}</span>
+          <span>${option ? option.label : id}</span>
+        </label>
+        <span></span>
+        <div class="rank-item__move">
+          <button type="button" data-move="up" aria-label="Yukarı taşı">▲</button>
+          <button type="button" data-move="down" aria-label="Aşağı taşı">▼</button>
+        </div>
+      `;
+      list.appendChild(item);
+    });
+  }
+
+  function collectWorkModesFromList() {
+    return $$('#workModeList .rank-item')
+      .filter((item) => item.querySelector('input').checked)
+      .map((item) => item.dataset.mode);
+  }
+
+  function commitWorkModes() {
+    state.profile.career.workModes = collectWorkModesFromList();
+    state.profile.career.workMode = state.profile.career.workModes[0] || '';
+    renderWorkModes();
+    updateDirtyState();
+  }
+
+  function onWorkModeChange(event) {
+    if (event.target.matches('input[type="checkbox"]')) commitWorkModes();
+  }
+
+  function onWorkModeClick(event) {
+    const button = event.target.closest('[data-move]');
+    if (!button) return;
+    const item = button.closest('.rank-item');
+    const sibling = button.dataset.move === 'up' ? item.previousElementSibling : item.nextElementSibling;
+    if (!sibling) return;
+    if (button.dataset.move === 'up') item.parentElement.insertBefore(item, sibling);
+    else item.parentElement.insertBefore(sibling, item);
+    commitWorkModes();
+  }
+
+  function renderCvCards() {
+    for (const lang of Shared.DOCUMENT_LANGUAGES) {
+      const meta = Shared.getPath(state.profile, `documents.${lang}`) || {};
+      const line = lang === 'tr' ? $('#cvMetaTr') : $('#cvMetaEn');
+      const remove = $(`[data-cv-remove="${lang}"]`);
+      if (meta.name) {
+        line.textContent = `${meta.name}${meta.size ? ` · ${Shared.formatBytes(meta.size)}` : ''}`;
+        remove.hidden = false;
+      } else {
+        line.textContent = 'Henüz dosya eklenmedi';
+        remove.hidden = true;
+      }
+    }
+  }
+
+  async function startCvPick(lang) {
+    if (IS_FIREFOX && !state.isFullPage) {
+      await extensionAPI.tabs.create({ url: `${extensionAPI.runtime.getURL('popup/popup.html')}#cv` });
+      window.close();
+      return;
+    }
+    state.cvPickLang = lang;
+    $('#cvFile').click();
+  }
+
+  async function handleCvPick(event) {
+    const file = event.target.files && event.target.files[0];
+    const lang = state.cvPickLang;
+    event.target.value = '';
+    state.cvPickLang = null;
+    if (!file || !lang) return;
+
+    if (!Shared.isAllowedDocument(file)) {
+      showToast('PDF, Word (.doc/.docx), RTF veya TXT yükle.', 'error');
+      return;
+    }
+    if (file.size > Shared.MAX_DOCUMENT_BYTES) {
+      showToast('CV en fazla 8 MB olabilir.', 'error');
+      return;
+    }
+
+    const bytes = await file.arrayBuffer();
+    await Shared.saveDocument(lang, {
+      name: file.name,
+      type: file.type || 'application/octet-stream',
+      size: file.size,
+      bytes
+    });
+    Shared.setPath(state.profile, `documents.${lang}`, { name: file.name, type: file.type || '', size: file.size });
+    state.profile = await Shared.saveProfile(state.profile);
+    populateProfileForm();
+    renderProfileWarning();
+    showToast(`${lang === 'tr' ? 'Türkçe' : 'İngilizce'} CV kaydedildi ✓`, 'success');
+  }
+
+  async function removeCv(lang) {
+    await Shared.deleteDocument(lang);
+    Shared.setPath(state.profile, `documents.${lang}`, { name: '', type: '', size: 0 });
+    state.profile = await Shared.saveProfile(state.profile);
+    populateProfileForm();
+    renderProfileWarning();
+    showToast('CV kaldırıldı', 'success');
   }
 
   function collectForm() {
@@ -405,6 +547,10 @@
     $$('[data-setting-field]').forEach((field) => {
       Shared.setPath(settings, field.dataset.settingField, field.value);
     });
+    if ($$('#workModeList .rank-item').length) {
+      profile.career.workModes = collectWorkModesFromList();
+      profile.career.workMode = profile.career.workModes[0] || '';
+    }
     return { profile, settings };
   }
 

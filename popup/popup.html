@@ -113,7 +113,7 @@
             </li>
             <li>
               <label class="switch-row">
-                <span class="switch-row__text"><strong>Tercihler &amp; Durum</strong><small>Çalışma modu, ihbar, askerlik, vize</small></span>
+                <span class="switch-row__text"><strong>Tercihler &amp; Durum</strong><small>Çalışma modu, ihbar, askerlik, İngilizce, vize</small></span>
                 <input type="checkbox" class="switch-input" data-setting="categories.preferences">
                 <span class="switch" aria-hidden="true"></span>
               </label>
@@ -129,6 +129,13 @@
               <label class="switch-row">
                 <span class="switch-row__text"><strong>Özgeçmiş Metinleri</strong><small>Özet, deneyim ve eğitim</small></span>
                 <input type="checkbox" class="switch-input" data-setting="categories.resume">
+                <span class="switch" aria-hidden="true"></span>
+              </label>
+            </li>
+            <li>
+              <label class="switch-row">
+                <span class="switch-row__text"><strong>CV Dosyası</strong><small>Türkçe / İngilizce PDF veya Word</small></span>
+                <input type="checkbox" class="switch-input" data-setting="categories.documents">
                 <span class="switch" aria-hidden="true"></span>
               </label>
             </li>
@@ -268,14 +275,10 @@
                 <label for="f-years">Toplam Deneyim (yıl)</label>
                 <input id="f-years" type="number" min="0" max="60" step="0.5" data-path="career.yearsOfExperience" data-number placeholder="4">
               </div>
-              <div class="field">
-                <label for="f-workMode">Çalışma Modu Tercihi</label>
-                <select id="f-workMode" data-path="career.workMode">
-                  <option value="">Seçiniz</option>
-                  <option value="remote">Uzaktan (Remote)</option>
-                  <option value="hybrid">Hibrit (Hybrid)</option>
-                  <option value="onsite">Ofisten (On-site)</option>
-                </select>
+              <div class="field field--full" id="workModeField">
+                <span class="field-group__title">Çalışma Modu Tercihleri</span>
+                <p class="hint">İstediğin kadarını işaretle. Üstteki 1. tercihtir. Form tek seçim istiyorsa sıradaki ilk uygun seçenek işaretlenir; birden fazla seçilebiliyorsa hepsi işaretlenir.</p>
+                <ol class="rank-list" id="workModeList"></ol>
               </div>
 
               <div class="field-group field--full">
@@ -335,6 +338,19 @@
                   <option value="exempt">Muaf</option>
                   <option value="postponed">Tecilli</option>
                   <option value="not_applicable">Yükümlü değil</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="f-englishLevel">İngilizce Seviyesi</label>
+                <select id="f-englishLevel" data-path="career.englishLevel">
+                  <option value="">Seçiniz</option>
+                  <option value="native">Ana dil / Native</option>
+                  <option value="c2">C2 – Ustalık (Proficient)</option>
+                  <option value="c1">C1 – İleri (Advanced)</option>
+                  <option value="b2">B2 – Orta üstü (Upper-Intermediate)</option>
+                  <option value="b1">B1 – Orta (Intermediate)</option>
+                  <option value="a2">A2 – Temel (Elementary)</option>
+                  <option value="a1">A1 – Başlangıç (Beginner)</option>
                 </select>
               </div>
               <div class="field">
@@ -416,6 +432,35 @@
                 <label for="f-en-education">Education Summary</label>
                 <textarea id="f-en-education" rows="3" data-path="en.education" data-counter placeholder="University – Degree – Graduation year" lang="en"></textarea>
               </div>
+            </div>
+          </details>
+
+          <details class="section" id="cvSection">
+            <summary class="section__head">
+              <span class="section__icon" aria-hidden="true">📄</span>
+              <span>CV / Özgeçmiş Dosyaları</span>
+            </summary>
+            <div class="section__body">
+              <p class="hint">Formda “CV yükle / Resume / Özgeçmiş” dosya alanı varsa, sayfanın diline göre buradaki dosya eklenir. En fazla 8 MB, PDF veya Word.</p>
+              <div class="cv-grid">
+                <div class="cv-card" data-cv-lang="tr">
+                  <strong>Türkçe CV</strong>
+                  <p class="cv-card__meta" id="cvMetaTr">Henüz dosya eklenmedi</p>
+                  <div class="data-actions">
+                    <button class="btn btn--ghost" type="button" data-cv-pick="tr">Dosya seç</button>
+                    <button class="btn btn--danger" type="button" data-cv-remove="tr" hidden>Kaldır</button>
+                  </div>
+                </div>
+                <div class="cv-card" data-cv-lang="en">
+                  <strong>İngilizce CV</strong>
+                  <p class="cv-card__meta" id="cvMetaEn">Henüz dosya eklenmedi</p>
+                  <div class="data-actions">
+                    <button class="btn btn--ghost" type="button" data-cv-pick="en">Dosya seç</button>
+                    <button class="btn btn--danger" type="button" data-cv-remove="en" hidden>Kaldır</button>
+                  </div>
+                </div>
+              </div>
+              <input type="file" id="cvFile" accept=".pdf,.doc,.docx,.rtf,.odt,.txt,application/pdf" hidden>
             </div>
           </details>
 

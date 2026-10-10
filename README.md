@@ -24,11 +24,11 @@
 
 ## Özellikler
 
-- **Tek seferlik profil:** Kişisel bilgiler, profesyonel linkler (LinkedIn, GitHub, portfolyo, Kaggle, X, Medium), maaş beklentisi (TL / USD / EUR), çalışma modu, ihbar süresi, askerlik durumu, çalışma izni / vize, taşınma tercihi.
+- **Tek seferlik profil:** Kişisel bilgiler, profesyonel linkler (LinkedIn, GitHub, portfolyo, Kaggle, X, Medium), maaş beklentisi (TL / USD / EUR), sıralı çalışma modu tercihleri (Remote / Hibrit / Ofis), ihbar süresi, askerlik durumu, çalışma izni / vize, taşınma tercihi, Türkçe ve İngilizce CV dosyası.
 - **İki dilli içerik:** Türkçe ve İngilizce ön yazı, özgeçmiş özeti, deneyim ve eğitim özetleri. Sayfanın dili otomatik algılanır (veya elle seçilir) ve doğru profil kullanılır.
 - **Akıllı alan eşleştirme:** `name`, `id`, `placeholder`, `aria-label`, `aria-labelledby`, `autocomplete`, `<label>`, `fieldset/legend` ve çevredeki metinler puanlanarak 30+ alan türü tanınır. Türkçe karakterler normalize edilir (`Adınız` → `adiniz`), camelCase/snake_case isimler ayrıştırılır.
 - **React / Vue / Angular uyumu:** Değer, prototipteki yerel `value` setter'ı ile atanır; ardından `input`, `change`, `blur` (ve `focusout`) olayları `bubbles: true` ile fırlatılır. Bu sayede controlled component state'i de güncellenir.
-- **Her kontrol türü:** metin, e-posta, telefon, URL, sayı, tarih alanları, `textarea`, `select`, radio grupları, onay kutuları ve `contenteditable` zengin metin editörleri. Açık Shadow DOM ve erişilebilir iframe'ler de taranır.
+- **Her kontrol türü:** metin, e-posta, telefon, URL, sayı, tarih alanları, `textarea`, `select`, radio grupları, onay kutuları, `contenteditable` editörler ve CV dosya yükleme (`input type="file"`). Açık Shadow DOM ve erişilebilir iframe'ler de taranır.
 - **Bağlama duyarlı değerler:**
   - "Annual / yıllık" maaş alanında aylık tutar otomatik ×12 (veya tersi).
   - Alan "USD / $ / €" diyorsa ilgili para birimindeki tutar kullanılır.
@@ -114,7 +114,7 @@ test/                    Örnek TR/EN formlar ve örnek profil
 
 ### Bilinen sınırlamalar
 
-- Workday gibi tamamen özel (div tabanlı) açılır menüler ve dosya yükleme alanları (CV PDF) doldurulmaz.
+- Workday gibi tamamen özel (div tabanlı) açılır menüler doldurulmaz. Gizli veya tamamen özel sürükle-bırak CV kutuları her sitede çalışmayabilir; klasik `input type="file"` alanları doldurulur.
 - Farklı origin'den gelen bazı iframe'lere `activeTab` izniyle erişilemeyebilir.
 - Bazı siteler `isTrusted` kontrolü yaparak programatik olayları reddedebilir.
 
