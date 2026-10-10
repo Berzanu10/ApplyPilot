@@ -7,7 +7,7 @@
 (() => {
   'use strict';
 
-  const ENGINE_VERSION = '1.2.0';
+  const ENGINE_VERSION = '1.2.1';
   const extensionAPI = typeof browser !== 'undefined' ? browser : (typeof chrome !== 'undefined' ? chrome : null);
 
   if (globalThis.__ApplyPilotEngine && globalThis.__ApplyPilotEngine.version === ENGINE_VERSION) {
@@ -400,6 +400,8 @@
     '[role="textbox"]',
     '[role="combobox"]',
     '[role="searchbox"]',
+    '[role="radio"]',
+    '[role="checkbox"]',
     '[aria-haspopup="listbox"]'
   ].join(', ');
   const TEXT_INPUT_TYPES = new Set(['text', 'email', 'tel', 'url', 'number', 'date', 'month', 'search']);
@@ -425,6 +427,8 @@
       if (role === 'combobox' || el.getAttribute('aria-haspopup') === 'listbox') return 'combobox';
       return TEXT_INPUT_TYPES.has(type) || type === '' ? 'input' : null;
     }
+    if (role === 'radio') return 'radio';
+    if (role === 'checkbox') return 'checkbox';
     if (role === 'combobox' || el.getAttribute('aria-haspopup') === 'listbox') return 'combobox';
     if (role === 'textbox' || role === 'searchbox') return el.isContentEditable ? 'editable' : 'input';
     if (el.isContentEditable && !(el.parentElement && el.parentElement.isContentEditable)) return 'editable';
@@ -438,24 +442,39 @@
     return style.visibility !== 'hidden' && style.visibility !== 'collapse' && style.display !== 'none';
   }
 
-  function isWidgetVisible(el) {
-    if (isVisible(el)) return true;
-    const widget = el.closest('label, [role="combobox"], [class*="input"], [class*="Input"], [class*="select"], [class*="Select"], [class*="field"], [class*="Field"], [class*="dropzone"], [class*="upload"]');
-    return Boolean(widget && widget !== el && isVisible(widget));
+  function isEffectivelyHidden(el) {
+    if (!el || el.nodeType !== 1) return true;
+    if (el.tagName === 'INPUT' && String(el.type).toLowerCase() === 'hidden') return true;
+    const style = getComputedStyle(el);
+    if (style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse') return true;
+    if (parseFloat(style.opacity) === 0) return true;
+    if (style.clipPath === 'inset(50%)' || /rect\(0px/.test(style.clip || '')) return true;
+    const rects = el.getClientRects();
+    if (!rects.length) return true;
+    const box = el.getBoundingClientRect();
+    if (box.width < 2 && box.height < 2) return true;
+    return false;
+  }
+
+  function hasVisibleAncestor(el) {
+    let node = el.parentElement;
+    for (let i = 0; i < 8 && node && node !== document.body; i += 1, node = node.parentElement) {
+      if (!isVisible(node)) continue;
+      const box = node.getBoundingClientRect();
+      if (box.width > 8 && box.height > 8) return true;
+    }
+    return false;
   }
 
   function isUsable(el, kind) {
     if (el.disabled) return false;
     const signature = `${el.getAttribute('name') || ''} ${el.id || ''} ${el.getAttribute('class') || ''}`.toLowerCase();
     if (/captcha|honeypot|\bhp_|bot.?field/.test(signature)) return false;
-    if ((kind === 'input' || kind === 'textarea') && el.readOnly && kind !== 'combobox') {
-      if (!el.closest('[role="combobox"]') && el.getAttribute('aria-haspopup') !== 'listbox') return false;
+    if (kind === 'file') {
+      return !isEffectivelyHidden(el) || hasVisibleAncestor(el) || Array.from(el.labels || []).some((label) => !isEffectivelyHidden(label));
     }
-    if (kind === 'radio' || kind === 'checkbox' || kind === 'file' || kind === 'select' || kind === 'combobox') {
-      return isWidgetVisible(el) || Array.from(el.labels || []).some(isVisible);
-    }
-    if (el.getAttribute('aria-hidden') === 'true' && !isWidgetVisible(el)) return false;
-    return isWidgetVisible(el);
+    if (isEffectivelyHidden(el)) return hasVisibleAncestor(el) && kind !== 'radio' && kind !== 'checkbox';
+    return true;
   }
 
   function getRootOf(el) {
@@ -694,9 +713,20 @@
     };
 
     for (const el of controls) {
-      if (controls.some((other) => other !== el && el.contains(other))) continue;
       const kind = getKind(el);
-      if (!kind || !isUsable(el, kind)) continue;
+      if (!kind) continue;
+
+      const innerBetter = controls.some((other) => {
+        if (other === el || !el.contains(other)) return false;
+        const otherKind = getKind(other);
+        return Boolean(otherKind && !isEffectivelyHidden(other) && isUsable(other, otherKind));
+      });
+      if (innerBetter) continue;
+
+      const hiddenInsideVisibleHost = isEffectivelyHidden(el) && controls.some((other) => other !== el && other.contains(el) && !isEffectivelyHidden(other) && getKind(other));
+      if (hiddenInsideVisibleHost) continue;
+
+      if (!isUsable(el, kind)) continue;
 
       if (kind === 'radio' || kind === 'checkbox') {
         const name = el.getAttribute('name');

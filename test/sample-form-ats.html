@@ -24,8 +24,8 @@
     </div>
   </div>
   <div class="field" style="margin-bottom:16px">
-    <span>Email *</span>
-    <input>
+      <span>Email *</span>
+      <input readonly>
   </div>
   <div class="row">
     <div class="field">
@@ -43,7 +43,10 @@
   </div>
   <div class="field" style="margin-bottom:16px">
     <span>Country of Residence *</span>
-    <div role="combobox" aria-haspopup="listbox" tabindex="0">Select one</div>
+    <div role="combobox" aria-haspopup="listbox" tabindex="0">
+      <input aria-hidden="true" tabindex="-1" style="position:absolute;opacity:0;width:1px;height:1px;border:0">
+      Select one
+    </div>
   </div>
   <p>Will you require visa sponsorship?</p>
   <label><input type="radio" name="sponsor"> Yes</label>
