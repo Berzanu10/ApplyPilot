@@ -1,0 +1,55 @@
+{
+  "manifest_version": 3,
+  "name": "ApplyPilot",
+  "short_name": "ApplyPilot",
+  "version": "1.0.0",
+  "description": "İş başvurusu formlarını Türkçe veya İngilizce profilinle tek tıkla doldur. Smart job application auto-fill (TR / EN).",
+  "homepage_url": "https://github.com/Berzanu10/ApplyPilot",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "action": {
+    "default_title": "ApplyPilot – Formu Doldur",
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    }
+  },
+  "options_ui": {
+    "page": "popup/popup.html",
+    "open_in_tab": true
+  },
+  "background": {
+    "service_worker": "scripts/background.js",
+    "scripts": ["scripts/shared.js", "scripts/background.js"]
+  },
+  "permissions": ["storage", "activeTab", "scripting", "contextMenus"],
+  "commands": {
+    "fill-page": {
+      "suggested_key": {
+        "default": "Alt+Shift+F",
+        "mac": "Alt+Shift+F"
+      },
+      "description": "Aktif sayfadaki başvuru formunu doldur"
+    }
+  },
+  "minimum_chrome_version": "121",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "applypilot@berzanu10.github.io",
+      "strict_min_version": "140.0",
+      "data_collection_permissions": {
+        "required": ["none"]
+      }
+    },
+    "gecko_android": {
+      "strict_min_version": "142.0"
+    }
+  }
+}

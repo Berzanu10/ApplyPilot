@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ApplyPilot test – Türkçe başvuru formu</title>
+  <style>
+    body { font: 14px/1.5 system-ui, sans-serif; max-width: 760px; margin: 32px auto; padding: 0 16px; color: #1f2937; }
+    h1 { font-size: 22px; }
+    section { border: 1px solid #e5e7eb; border-radius: 10px; margin: 0 0 16px; padding: 12px 16px; }
+    h2 { font-size: 15px; margin: 0 0 10px; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .form-group { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+    .form-group > label, .baslik { font-weight: 600; font-size: 13px; }
+    input, select, textarea { padding: 7px 9px; border: 1px solid #d1d5db; border-radius: 6px; font: inherit; }
+    pre { background: #111827; color: #d1fae5; padding: 12px; border-radius: 8px; white-space: pre-wrap; font-size: 12px; }
+    button { padding: 8px 14px; border-radius: 6px; border: 0; background: #4f46e5; color: #fff; font-weight: 600; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>Yazılım Geliştirici İlanı – Başvuru Formu</h1>
+  <p>Lütfen zorunlu alanları doldurunuz. Bu sayfa Türkçe kariyer sitelerindeki form yapılarını taklit eder.</p>
+
+  <form id="basvuru" onsubmit="return false">
+    <section>
+      <h2>Kişisel Bilgiler</h2>
+      <div class="row">
+        <div class="form-group"><label for="ad">Adınız *</label><input id="ad" name="ad" data-state="ad"></div>
+        <div class="form-group"><label for="soyad">Soyadınız *</label><input id="soyad" name="soyad" data-state="soyad"></div>
+      </div>
+      <div class="row">
+        <div class="form-group"><label for="eposta">E-posta Adresi</label><input id="eposta" name="eposta" data-state="eposta"></div>
+        <div class="form-group"><label for="cep">Cep Telefonu</label><input id="cep" name="cep" maxlength="10" placeholder="5XXXXXXXXX" data-state="telefon"></div>
+      </div>
+      <div class="row">
+        <div class="form-group"><label for="dogum">Doğum Tarihi</label><input id="dogum" placeholder="GG.AA.YYYY" data-state="dogum"></div>
+        <div class="form-group"><label for="dogumyeri">Doğum Yeri</label><input id="dogumyeri" data-state="dogumYeri"></div>
+      </div>
+      <div class="row">
+        <div class="form-group">
+          <label for="sehir">Yaşadığınız Şehir</label>
+          <select id="sehir" data-state="sehir">
+            <option value="">Seçiniz</option>
+            <option>Ankara</option>
+            <option>İstanbul</option>
+            <option>İzmir</option>
+          </select>
+        </div>
+        <div class="form-group"><label for="ulke">Ülke</label><input id="ulke" data-state="ulke"></div>
+      </div>
+      <div class="form-group"><label for="adres">Açık Adres</label><textarea id="adres" rows="2" data-state="adres"></textarea></div>
+    </section>
+
+    <section>
+      <h2>Profesyonel Bilgiler</h2>
+      <div class="row">
+        <div class="form-group"><label for="li">LinkedIn Profiliniz</label><input id="li" data-state="linkedin"></div>
+        <div class="form-group"><label for="gh">GitHub Hesabınız</label><input id="gh" data-state="github"></div>
+      </div>
+      <div class="row">
+        <div class="form-group"><label for="maas">Net Maaş Beklentiniz (TL)</label><input id="maas" data-state="maas"></div>
+        <div class="form-group"><label for="ihbar">İhbar Süreniz</label><input id="ihbar" data-state="ihbar"></div>
+      </div>
+      <div class="row">
+        <div class="form-group">
+          <label for="askerlik">Askerlik Durumu</label>
+          <select id="askerlik" data-state="askerlik">
+            <option value="">Seçiniz</option>
+            <option value="1">Yapıldı</option>
+            <option value="2">Muaf</option>
+            <option value="3">Tecilli</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="calisma">Çalışma Modeli Tercihi</label>
+          <select id="calisma" data-state="calismaModeli">
+            <option value="">Seçiniz</option>
+            <option value="ofis">Ofisten</option>
+            <option value="hibrit">Hibrit</option>
+            <option value="uzaktan">Uzaktan</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Ön Yazı ve Özgeçmiş</h2>
+      <div class="form-group"><label for="onyazi">Ön Yazı</label><textarea id="onyazi" rows="4" data-state="onYazi"></textarea></div>
+      <div class="form-group"><label for="hakkimda">Kendinizi kısaca tanıtın</label><textarea id="hakkimda" rows="3" data-state="hakkimda"></textarea></div>
+      <div class="form-group"><label for="egitim">Eğitim Bilgileriniz</label><textarea id="egitim" rows="2" data-state="egitim"></textarea></div>
+    </section>
+
+    <button type="button" id="goster">Form durumunu göster</button>
+  </form>
+  <pre id="durum">{}</pre>
+
+  <script>
+    const store = {};
+    const form = document.getElementById('basvuru');
+    ['input', 'change'].forEach((type) => form.addEventListener(type, (e) => {
+      const el = e.target.closest('[data-state]');
+      if (el) store[el.dataset.state] = el.value;
+    }, true));
+    document.getElementById('goster').addEventListener('click', () => {
+      document.getElementById('durum').textContent = JSON.stringify(store, null, 2);
+    });
+  </script>
+</body>
+</html>

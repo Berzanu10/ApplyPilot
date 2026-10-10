@@ -1,0 +1,72 @@
+{
+  "app": "ApplyPilot",
+  "version": "1.0.0",
+  "exportedAt": "2026-10-10T00:00:00.000Z",
+  "profile": {
+    "personal": {
+      "firstName": "Ayşe",
+      "lastName": "Yılmaz",
+      "email": "ayse.yilmaz@example.com",
+      "phone": "+90 532 123 45 67",
+      "birthDate": "1996-04-23",
+      "address": "Moda Mah. Bahariye Cad. No: 12 D: 5, Kadıköy",
+      "city": "İstanbul",
+      "postalCode": "34710",
+      "country": "Türkiye"
+    },
+    "links": {
+      "linkedin": "https://linkedin.com/in/ayseyilmaz",
+      "github": "https://github.com/ayseyilmaz",
+      "portfolio": "https://ayseyilmaz.dev/work",
+      "website": "https://ayseyilmaz.dev",
+      "kaggle": "https://kaggle.com/ayseyilmaz",
+      "twitter": "",
+      "medium": ""
+    },
+    "career": {
+      "currentTitle": "Frontend Developer",
+      "currentCompany": "Örnek Teknoloji A.Ş.",
+      "yearsOfExperience": "5",
+      "salaryTRY": "95000",
+      "salaryUSD": "4500",
+      "salaryEUR": "4000",
+      "preferredCurrency": "TRY",
+      "salaryPeriod": "monthly",
+      "workMode": "remote",
+      "noticeAmount": "2",
+      "noticeUnit": "weeks",
+      "militaryStatus": "not_applicable",
+      "workAuthorization": "citizen",
+      "visaDetails": "",
+      "requiresSponsorship": "no",
+      "willingToRelocate": "yes"
+    },
+    "tr": {
+      "coverLetter": "Sayın İşe Alım Ekibi,\n\nFrontend geliştirme alanındaki 5 yıllık deneyimimle ekibinize katkı sağlamak istiyorum. React ve TypeScript ile ölçeklenebilir arayüzler geliştirdim.\n\nSaygılarımla,\nAyşe Yılmaz",
+      "summary": "React, TypeScript ve tasarım sistemleri konusunda uzman, 5 yıllık deneyime sahip frontend geliştirici.",
+      "experience": "Örnek Teknoloji A.Ş. – Frontend Developer (2022–günümüz)\nDijital Ajans – Junior Developer (2020–2022)",
+      "education": "Boğaziçi Üniversitesi – Bilgisayar Mühendisliği (2019)"
+    },
+    "en": {
+      "coverLetter": "Dear Hiring Team,\n\nWith 5 years of frontend experience building scalable React and TypeScript applications, I would love to contribute to your team.\n\nBest regards,\nAyşe Yılmaz",
+      "summary": "Frontend developer with 5 years of experience specialising in React, TypeScript and design systems.",
+      "experience": "Örnek Teknoloji – Frontend Developer (2022–present)\nDigital Agency – Junior Developer (2020–2022)",
+      "education": "Boğaziçi University – B.Sc. Computer Engineering (2019)"
+    }
+  },
+  "settings": {
+    "defaultLanguage": "auto",
+    "categories": {
+      "personal": true,
+      "links": true,
+      "career": true,
+      "salary": true,
+      "preferences": true,
+      "coverLetter": true,
+      "resume": true
+    },
+    "overwriteExisting": false,
+    "highlightFields": true,
+    "fallbackToOtherLanguage": true
+  }
+}

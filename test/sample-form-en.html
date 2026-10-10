@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ApplyPilot test – English application form</title>
+  <style>
+    body { font: 14px/1.5 system-ui, sans-serif; max-width: 760px; margin: 32px auto; padding: 0 16px; color: #1f2937; }
+    h1 { font-size: 22px; }
+    fieldset { border: 1px solid #e5e7eb; border-radius: 10px; margin: 0 0 16px; padding: 12px 16px; }
+    legend { font-weight: 700; padding: 0 6px; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+    .field > span, .q { font-weight: 600; font-size: 13px; }
+    input, select, textarea { padding: 7px 9px; border: 1px solid #d1d5db; border-radius: 6px; font: inherit; }
+    .editor { min-height: 70px; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; }
+    pre { background: #111827; color: #d1fae5; padding: 12px; border-radius: 8px; white-space: pre-wrap; font-size: 12px; }
+    button { padding: 8px 14px; border-radius: 6px; border: 0; background: #4f46e5; color: #fff; font-weight: 600; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>Senior Frontend Engineer – Apply</h1>
+  <p>Fields marked with * are required. This page mimics Greenhouse / Lever style markup and keeps a "framework" state that only updates through <code>input</code> / <code>change</code> events.</p>
+
+  <form id="application" onsubmit="return false">
+    <fieldset>
+      <legend>Personal information</legend>
+      <div class="row">
+        <label class="field"><span>First Name *</span><input name="job_application[first_name]" data-state="firstName"></label>
+        <label class="field"><span>Last Name *</span><input name="job_application[last_name]" data-state="lastName"></label>
+      </div>
+      <div class="row">
+        <div class="field"><label for="email">Email *</label><input id="email" type="email" data-state="email"></div>
+        <div class="field"><label for="phone">Phone</label><input id="phone" type="tel" data-state="phone"></div>
+      </div>
+      <div class="row">
+        <div class="field"><label for="dob">Date of birth</label><input id="dob" placeholder="MM/DD/YYYY" data-state="dob"></div>
+        <div class="field"><label for="loc">Location (City)</label><input id="loc" data-state="location"></div>
+      </div>
+      <div class="field">
+        <label for="country">Country</label>
+        <select id="country" data-state="country">
+          <option value="">Select…</option>
+          <option value="DE">Germany</option>
+          <option value="NL">Netherlands</option>
+          <option value="TR">Turkey</option>
+          <option value="US">United States</option>
+        </select>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Links</legend>
+      <div class="row">
+        <div class="field"><div class="q">LinkedIn Profile</div><input name="urls[LinkedIn]" type="url" data-state="linkedin"></div>
+        <div class="field"><div class="q">GitHub URL</div><input name="urls[GitHub]" type="url" data-state="github"></div>
+      </div>
+      <div class="row">
+        <div class="field"><div class="q">Portfolio</div><input name="urls[Portfolio]" type="url" data-state="portfolio"></div>
+        <div class="field"><div class="q">Other website</div><input name="urls[Other]" type="url" data-state="website"></div>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Job preferences</legend>
+      <div class="row">
+        <div class="field"><label for="salary">Desired annual salary (USD)</label><input id="salary" type="number" data-state="salary"></div>
+        <div class="field">
+          <label for="notice">Notice period</label>
+          <select id="notice" data-state="notice">
+            <option value="">Please select</option>
+            <option>Immediately</option>
+            <option>1 week</option>
+            <option>2 weeks</option>
+            <option>1 month</option>
+            <option>2+ months</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label for="years">Years of experience</label>
+        <select id="years" data-state="years">
+          <option value="">Select</option>
+          <option>0-1 years</option>
+          <option>2-4 years</option>
+          <option>5-7 years</option>
+          <option>8+ years</option>
+        </select>
+      </div>
+      <div class="field">
+        <div class="q">Preferred work arrangement</div>
+        <div role="radiogroup">
+          <label><input type="radio" name="work_mode" value="remote" data-state="workMode"> Remote</label>
+          <label><input type="radio" name="work_mode" value="hybrid" data-state="workMode"> Hybrid</label>
+          <label><input type="radio" name="work_mode" value="onsite" data-state="workMode"> On-site</label>
+        </div>
+      </div>
+      <div class="field">
+        <div class="q">Are you legally authorized to work in the country where this job is located?</div>
+        <div>
+          <label><input type="radio" name="q_auth" value="1" data-state="authorized"> Yes</label>
+          <label><input type="radio" name="q_auth" value="0" data-state="authorized"> No</label>
+        </div>
+      </div>
+      <div class="field">
+        <div class="q">Will you now or in the future require visa sponsorship?</div>
+        <div>
+          <label><input type="radio" name="q_sponsor" value="yes" data-state="sponsorship"> Yes</label>
+          <label><input type="radio" name="q_sponsor" value="no" data-state="sponsorship"> No</label>
+        </div>
+      </div>
+      <label><input type="checkbox" name="relocate" data-state="relocate"> I am willing to relocate</label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Tell us about you</legend>
+      <div class="field"><label for="summary">Professional summary</label><textarea id="summary" rows="3" data-state="summary"></textarea></div>
+      <div class="field"><span class="q" id="cl-label">Cover Letter</span><div class="editor" contenteditable="true" role="textbox" aria-labelledby="cl-label" data-state="coverLetter"></div></div>
+      <div class="field"><label for="extra">Additional information</label><textarea id="extra" rows="2" data-state="extra"></textarea></div>
+      <label><input type="checkbox" name="privacy" data-state="privacy"> I agree to the privacy policy</label>
+    </fieldset>
+
+    <button type="button" id="show">Show framework state</button>
+  </form>
+  <pre id="state">{}</pre>
+
+  <script>
+    // Minimal "controlled component" store: state only changes through events.
+    const store = {};
+    const form = document.getElementById('application');
+    const read = (el) => el.type === 'checkbox' ? el.checked : el.type === 'radio' ? (el.checked ? el.value : store[el.dataset.state]) : el.isContentEditable ? el.textContent : el.value;
+    ['input', 'change'].forEach((type) => form.addEventListener(type, (e) => {
+      const el = e.target.closest('[data-state]');
+      if (el) store[el.dataset.state] = read(el);
+    }, true));
+    let blurCount = 0;
+    form.addEventListener('blur', () => { blurCount += 1; }, true);
+    document.getElementById('show').addEventListener('click', () => {
+      document.getElementById('state').textContent = JSON.stringify({ ...store, _blurEvents: blurCount }, null, 2);
+    });
+  </script>
+</body>
+</html>

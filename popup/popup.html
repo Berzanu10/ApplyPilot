@@ -1,0 +1,461 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ApplyPilot</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="app" id="app">
+    <header class="app-header">
+      <div class="brand">
+        <img class="brand__logo" src="../icons/icon-48.png" alt="" width="30" height="30">
+        <div>
+          <h1 class="brand__name">ApplyPilot</h1>
+          <span class="brand__version" id="appVersion">v1.0.0</span>
+        </div>
+      </div>
+      <button class="icon-btn" id="openFullPage" type="button" title="Tam sayfada aç" aria-label="Tam sayfada aç">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M14 3h7v7h-2V6.41l-7.29 7.3-1.42-1.42L17.59 5H14V3zM5 5h5v2H7v10h10v-3h2v5H5V5z"/></svg>
+      </button>
+    </header>
+
+    <nav class="tabs" role="tablist" aria-label="ApplyPilot sekmeleri">
+      <button class="tab is-active" type="button" role="tab" id="tab-home" aria-controls="panel-home" aria-selected="true" data-tab="home">
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M13 2 4 14h6l-1 8 9-12h-6l1-8z"/></svg>
+        Hızlı Doldur
+      </button>
+      <button class="tab" type="button" role="tab" id="tab-profile" aria-controls="panel-profile" aria-selected="false" data-tab="profile" tabindex="-1">
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10zm0 2c-4.42 0-8 2.24-8 5v3h16v-3c0-2.76-3.58-5-8-5z"/></svg>
+        Profil &amp; Bilgilerim
+        <span class="dirty-dot" id="dirtyDot" hidden title="Kaydedilmemiş değişiklikler"></span>
+      </button>
+    </nav>
+
+    <main class="panels">
+      <!-- ============================ HOME ============================ -->
+      <section class="panel is-active" id="panel-home" role="tabpanel" aria-labelledby="tab-home">
+        <div class="page-card" id="pageCard" data-status="loading">
+          <div class="page-card__row">
+            <div class="page-card__site">
+              <span class="status-dot" aria-hidden="true"></span>
+              <span class="page-card__host" id="pageHost">Sayfa analiz ediliyor…</span>
+            </div>
+            <span class="chip" id="pageLangChip" hidden></span>
+          </div>
+          <p class="page-card__meta" id="pageMeta">Form alanları taranıyor…</p>
+        </div>
+
+        <div class="notice notice--warn" id="profileWarning" hidden>
+          <span>Profilin henüz eksik (<strong id="completenessText">%0</strong>). Doldurma için önce bilgilerini gir.</span>
+          <button class="link-btn" type="button" data-goto="profile">Profili doldur →</button>
+        </div>
+
+        <button class="btn btn--primary btn--xl" id="fillButton" type="button">
+          <span class="spinner" aria-hidden="true"></span>
+          <svg class="btn__icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M2.01 21 23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+          <span class="btn__label" id="fillButtonLabel">Sayfayı Doldur</span>
+        </button>
+        <p class="hint hint--center">Kısayol: <kbd>Alt</kbd> + <kbd>Shift</kbd> + <kbd>F</kbd> · Sağ tık menüsünden de doldurabilirsin.</p>
+
+        <div class="result" id="fillResult" data-variant="success" hidden>
+          <div class="result__head">
+            <strong class="result__title" id="resultTitle"></strong>
+            <span class="result__sub" id="resultSub"></span>
+          </div>
+          <div class="result__chips" id="resultChips"></div>
+        </div>
+
+        <div class="card">
+          <h2 class="card__title">Doldurma Dili</h2>
+          <div class="segmented" role="radiogroup" aria-label="Doldurma dili">
+            <input type="radio" name="fillLanguage" id="lang-auto" value="auto">
+            <label for="lang-auto">Otomatik</label>
+            <input type="radio" name="fillLanguage" id="lang-tr" value="tr">
+            <label for="lang-tr">Türkçe</label>
+            <input type="radio" name="fillLanguage" id="lang-en" value="en">
+            <label for="lang-en">English</label>
+          </div>
+          <p class="hint" id="langHint">Otomatik modda sayfanın dili algılanır ve uygun profil kullanılır.</p>
+        </div>
+
+        <div class="card">
+          <h2 class="card__title">Doldurulacak Veriler</h2>
+          <ul class="toggle-list">
+            <li>
+              <label class="switch-row">
+                <span class="switch-row__text"><strong>Kişisel Bilgiler</strong><small>Ad, soyad, e-posta, telefon, adres</small></span>
+                <input type="checkbox" class="switch-input" data-setting="categories.personal">
+                <span class="switch" aria-hidden="true"></span>
+              </label>
+            </li>
+            <li>
+              <label class="switch-row">
+                <span class="switch-row__text"><strong>Profesyonel Linkler</strong><small>LinkedIn, GitHub, portfolyo, Kaggle</small></span>
+                <input type="checkbox" class="switch-input" data-setting="categories.links">
+                <span class="switch" aria-hidden="true"></span>
+              </label>
+            </li>
+            <li>
+              <label class="switch-row">
+                <span class="switch-row__text"><strong>Kariyer Bilgileri</strong><small>Ünvan, şirket, deneyim yılı</small></span>
+                <input type="checkbox" class="switch-input" data-setting="categories.career">
+                <span class="switch" aria-hidden="true"></span>
+              </label>
+            </li>
+            <li>
+              <label class="switch-row">
+                <span class="switch-row__text"><strong>Maaş Beklentisi</strong><small>TL / USD / EUR ve para birimi</small></span>
+                <input type="checkbox" class="switch-input" data-setting="categories.salary">
+                <span class="switch" aria-hidden="true"></span>
+              </label>
+            </li>
+            <li>
+              <label class="switch-row">
+                <span class="switch-row__text"><strong>Tercihler &amp; Durum</strong><small>Çalışma modu, ihbar, askerlik, vize</small></span>
+                <input type="checkbox" class="switch-input" data-setting="categories.preferences">
+                <span class="switch" aria-hidden="true"></span>
+              </label>
+            </li>
+            <li>
+              <label class="switch-row">
+                <span class="switch-row__text"><strong>Ön Yazı</strong><small>Cover letter / motivasyon metni</small></span>
+                <input type="checkbox" class="switch-input" data-setting="categories.coverLetter">
+                <span class="switch" aria-hidden="true"></span>
+              </label>
+            </li>
+            <li>
+              <label class="switch-row">
+                <span class="switch-row__text"><strong>Özgeçmiş Metinleri</strong><small>Özet, deneyim ve eğitim</small></span>
+                <input type="checkbox" class="switch-input" data-setting="categories.resume">
+                <span class="switch" aria-hidden="true"></span>
+              </label>
+            </li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h2 class="card__title">Seçenekler</h2>
+          <ul class="toggle-list">
+            <li>
+              <label class="switch-row">
+                <span class="switch-row__text"><strong>Dolu alanların üzerine yaz</strong><small>Kapalıyken sadece boş alanlar doldurulur</small></span>
+                <input type="checkbox" class="switch-input" data-setting="overwriteExisting">
+                <span class="switch" aria-hidden="true"></span>
+              </label>
+            </li>
+            <li>
+              <label class="switch-row">
+                <span class="switch-row__text"><strong>Doldurulan alanları vurgula</strong><small>Alanlar birkaç saniye yeşil çerçeveyle işaretlenir</small></span>
+                <input type="checkbox" class="switch-input" data-setting="highlightFields">
+                <span class="switch" aria-hidden="true"></span>
+              </label>
+            </li>
+            <li>
+              <label class="switch-row">
+                <span class="switch-row__text"><strong>Eksik metinde diğer dili kullan</strong><small>Örn. İngilizce ön yazı yoksa Türkçesini kullan</small></span>
+                <input type="checkbox" class="switch-input" data-setting="fallbackToOtherLanguage">
+                <span class="switch" aria-hidden="true"></span>
+              </label>
+            </li>
+          </ul>
+        </div>
+
+        <p class="stats" id="statsLine"></p>
+      </section>
+
+      <!-- =========================== PROFILE ========================== -->
+      <section class="panel" id="panel-profile" role="tabpanel" aria-labelledby="tab-profile" hidden>
+        <form id="profileForm" class="profile-form" novalidate autocomplete="off">
+          <details class="section" open>
+            <summary class="section__head">
+              <span class="section__icon" aria-hidden="true">👤</span>
+              <span>Temel Kişisel Bilgiler</span>
+            </summary>
+            <div class="section__body grid-2">
+              <div class="field">
+                <label for="f-firstName">Ad</label>
+                <input id="f-firstName" type="text" data-path="personal.firstName" placeholder="Ayşe">
+              </div>
+              <div class="field">
+                <label for="f-lastName">Soyad</label>
+                <input id="f-lastName" type="text" data-path="personal.lastName" placeholder="Yılmaz">
+              </div>
+              <div class="field">
+                <label for="f-email">E-posta</label>
+                <input id="f-email" type="email" data-path="personal.email" placeholder="ayse@ornek.com">
+              </div>
+              <div class="field">
+                <label for="f-phone">Telefon</label>
+                <input id="f-phone" type="tel" data-path="personal.phone" placeholder="+90 532 123 45 67">
+              </div>
+              <div class="field">
+                <label for="f-birthDate">Doğum Tarihi</label>
+                <input id="f-birthDate" type="date" data-path="personal.birthDate">
+              </div>
+              <div class="field">
+                <label for="f-postalCode">Posta Kodu</label>
+                <input id="f-postalCode" type="text" data-path="personal.postalCode" placeholder="34000">
+              </div>
+              <div class="field field--full">
+                <label for="f-address">Adres</label>
+                <textarea id="f-address" rows="2" data-path="personal.address" placeholder="Mahalle, cadde, sokak, no"></textarea>
+              </div>
+              <div class="field">
+                <label for="f-city">Şehir</label>
+                <input id="f-city" type="text" data-path="personal.city" placeholder="İstanbul">
+              </div>
+              <div class="field">
+                <label for="f-country">Ülke</label>
+                <input id="f-country" type="text" data-path="personal.country" placeholder="Türkiye">
+              </div>
+            </div>
+          </details>
+
+          <details class="section">
+            <summary class="section__head">
+              <span class="section__icon" aria-hidden="true">🔗</span>
+              <span>Profesyonel Linkler</span>
+            </summary>
+            <div class="section__body grid-2">
+              <div class="field">
+                <label for="f-linkedin">LinkedIn</label>
+                <input id="f-linkedin" type="url" data-path="links.linkedin" data-url placeholder="linkedin.com/in/kullanici">
+              </div>
+              <div class="field">
+                <label for="f-github">GitHub</label>
+                <input id="f-github" type="url" data-path="links.github" data-url placeholder="github.com/kullanici">
+              </div>
+              <div class="field">
+                <label for="f-portfolio">Portfolyo</label>
+                <input id="f-portfolio" type="url" data-path="links.portfolio" data-url placeholder="behance.net/kullanici">
+              </div>
+              <div class="field">
+                <label for="f-website">Kişisel Web Sitesi</label>
+                <input id="f-website" type="url" data-path="links.website" data-url placeholder="ornek.dev">
+              </div>
+              <div class="field">
+                <label for="f-kaggle">Kaggle</label>
+                <input id="f-kaggle" type="url" data-path="links.kaggle" data-url placeholder="kaggle.com/kullanici">
+              </div>
+              <div class="field">
+                <label for="f-twitter">X / Twitter</label>
+                <input id="f-twitter" type="url" data-path="links.twitter" data-url placeholder="x.com/kullanici">
+              </div>
+              <div class="field">
+                <label for="f-medium">Medium / Blog</label>
+                <input id="f-medium" type="url" data-path="links.medium" data-url placeholder="medium.com/@kullanici">
+              </div>
+            </div>
+          </details>
+
+          <details class="section">
+            <summary class="section__head">
+              <span class="section__icon" aria-hidden="true">💼</span>
+              <span>İş Beklentileri &amp; Durum</span>
+            </summary>
+            <div class="section__body grid-2">
+              <div class="field">
+                <label for="f-currentTitle">Mevcut Ünvan</label>
+                <input id="f-currentTitle" type="text" data-path="career.currentTitle" placeholder="Frontend Developer">
+              </div>
+              <div class="field">
+                <label for="f-currentCompany">Mevcut Şirket</label>
+                <input id="f-currentCompany" type="text" data-path="career.currentCompany" placeholder="Şirket A.Ş.">
+              </div>
+              <div class="field">
+                <label for="f-years">Toplam Deneyim (yıl)</label>
+                <input id="f-years" type="number" min="0" max="60" step="0.5" data-path="career.yearsOfExperience" data-number placeholder="4">
+              </div>
+              <div class="field">
+                <label for="f-workMode">Çalışma Modu Tercihi</label>
+                <select id="f-workMode" data-path="career.workMode">
+                  <option value="">Seçiniz</option>
+                  <option value="remote">Uzaktan (Remote)</option>
+                  <option value="hybrid">Hibrit (Hybrid)</option>
+                  <option value="onsite">Ofisten (On-site)</option>
+                </select>
+              </div>
+
+              <div class="field-group field--full">
+                <span class="field-group__title">Maaş Beklentisi</span>
+                <div class="grid-3">
+                  <div class="field">
+                    <label for="f-salaryTRY">₺ TL</label>
+                    <input id="f-salaryTRY" type="text" inputmode="numeric" data-path="career.salaryTRY" data-amount placeholder="85000">
+                  </div>
+                  <div class="field">
+                    <label for="f-salaryUSD">$ USD</label>
+                    <input id="f-salaryUSD" type="text" inputmode="numeric" data-path="career.salaryUSD" data-amount placeholder="3000">
+                  </div>
+                  <div class="field">
+                    <label for="f-salaryEUR">€ EUR</label>
+                    <input id="f-salaryEUR" type="text" inputmode="numeric" data-path="career.salaryEUR" data-amount placeholder="2800">
+                  </div>
+                </div>
+                <div class="grid-2">
+                  <div class="field">
+                    <label for="f-preferredCurrency">Tercih Edilen Para Birimi</label>
+                    <select id="f-preferredCurrency" data-path="career.preferredCurrency">
+                      <option value="TRY">₺ Türk Lirası</option>
+                      <option value="USD">$ ABD Doları</option>
+                      <option value="EUR">€ Euro</option>
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label for="f-salaryPeriod">Tutar Periyodu</label>
+                    <select id="f-salaryPeriod" data-path="career.salaryPeriod">
+                      <option value="monthly">Aylık</option>
+                      <option value="yearly">Yıllık</option>
+                    </select>
+                  </div>
+                </div>
+                <p class="hint">Formda "yıllık / annual" geçiyorsa tutar otomatik olarak 12 ile çarpılır (veya bölünür).</p>
+              </div>
+
+              <div class="field">
+                <label for="f-noticeAmount">İhbar Süresi</label>
+                <div class="input-pair">
+                  <input id="f-noticeAmount" type="number" min="0" max="365" data-path="career.noticeAmount" data-number placeholder="2">
+                  <select id="f-noticeUnit" data-path="career.noticeUnit" aria-label="İhbar süresi birimi">
+                    <option value="">Birim</option>
+                    <option value="immediate">Hemen başlayabilirim</option>
+                    <option value="days">Gün</option>
+                    <option value="weeks">Hafta</option>
+                    <option value="months">Ay</option>
+                  </select>
+                </div>
+              </div>
+              <div class="field">
+                <label for="f-military">Askerlik Durumu</label>
+                <select id="f-military" data-path="career.militaryStatus">
+                  <option value="">Seçiniz</option>
+                  <option value="completed">Yapıldı</option>
+                  <option value="exempt">Muaf</option>
+                  <option value="postponed">Tecilli</option>
+                  <option value="not_applicable">Yükümlü değil</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="f-workAuth">Çalışma İzni / Vize</label>
+                <select id="f-workAuth" data-path="career.workAuthorization">
+                  <option value="">Seçiniz</option>
+                  <option value="citizen">Vatandaşım – izin gerekmiyor</option>
+                  <option value="permit">Geçerli çalışma iznim var</option>
+                  <option value="visa_required">Vize / çalışma izni gerekiyor</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="f-sponsorship">Vize Sponsorluğu Gerekli mi?</label>
+                <select id="f-sponsorship" data-path="career.requiresSponsorship">
+                  <option value="">Seçiniz</option>
+                  <option value="no">Hayır</option>
+                  <option value="yes">Evet</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="f-relocate">Taşınmaya Açık mısın?</label>
+                <select id="f-relocate" data-path="career.willingToRelocate">
+                  <option value="">Seçiniz</option>
+                  <option value="yes">Evet</option>
+                  <option value="no">Hayır</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="f-visaDetails">Vize / İzin Detayı</label>
+                <input id="f-visaDetails" type="text" data-path="career.visaDetails" placeholder="Örn. AB Mavi Kart, 2027'ye kadar">
+              </div>
+            </div>
+          </details>
+
+          <details class="section">
+            <summary class="section__head">
+              <span class="section__icon" aria-hidden="true">🇹🇷</span>
+              <span>Türkçe Profil</span>
+            </summary>
+            <div class="section__body">
+              <div class="field">
+                <label for="f-tr-cover">Ön Yazı</label>
+                <textarea id="f-tr-cover" rows="6" data-path="tr.coverLetter" data-counter placeholder="Sayın İşe Alım Ekibi, …"></textarea>
+              </div>
+              <div class="field">
+                <label for="f-tr-summary">Özgeçmiş Özeti / CV Metni</label>
+                <textarea id="f-tr-summary" rows="5" data-path="tr.summary" data-counter placeholder="Kısaca kendinden ve uzmanlığından bahset."></textarea>
+              </div>
+              <div class="field">
+                <label for="f-tr-experience">Deneyim Özeti</label>
+                <textarea id="f-tr-experience" rows="4" data-path="tr.experience" data-counter placeholder="Şirket – Pozisyon – Tarih – Başarılar"></textarea>
+              </div>
+              <div class="field">
+                <label for="f-tr-education">Eğitim Özeti</label>
+                <textarea id="f-tr-education" rows="3" data-path="tr.education" data-counter placeholder="Üniversite – Bölüm – Mezuniyet yılı"></textarea>
+              </div>
+            </div>
+          </details>
+
+          <details class="section">
+            <summary class="section__head">
+              <span class="section__icon" aria-hidden="true">🇬🇧</span>
+              <span>İngilizce Profil</span>
+            </summary>
+            <div class="section__body">
+              <div class="field">
+                <label for="f-en-cover">Cover Letter</label>
+                <textarea id="f-en-cover" rows="6" data-path="en.coverLetter" data-counter placeholder="Dear Hiring Team, …" lang="en"></textarea>
+              </div>
+              <div class="field">
+                <label for="f-en-summary">Resume Summary / CV Text</label>
+                <textarea id="f-en-summary" rows="5" data-path="en.summary" data-counter placeholder="A short professional summary." lang="en"></textarea>
+              </div>
+              <div class="field">
+                <label for="f-en-experience">Experience Summary</label>
+                <textarea id="f-en-experience" rows="4" data-path="en.experience" data-counter placeholder="Company – Role – Dates – Achievements" lang="en"></textarea>
+              </div>
+              <div class="field">
+                <label for="f-en-education">Education Summary</label>
+                <textarea id="f-en-education" rows="3" data-path="en.education" data-counter placeholder="University – Degree – Graduation year" lang="en"></textarea>
+              </div>
+            </div>
+          </details>
+
+          <details class="section">
+            <summary class="section__head">
+              <span class="section__icon" aria-hidden="true">⚙️</span>
+              <span>Tercihler &amp; Veri Yönetimi</span>
+            </summary>
+            <div class="section__body">
+              <div class="field">
+                <label for="f-defaultLanguage">Varsayılan Doldurma Dili</label>
+                <select id="f-defaultLanguage" data-setting-field="defaultLanguage">
+                  <option value="auto">Otomatik Algıla</option>
+                  <option value="tr">Türkçe</option>
+                  <option value="en">İngilizce</option>
+                </select>
+                <p class="hint">Kısayol ve sağ tık menüsü bu dili kullanır; popup'ta her doldurma için değiştirebilirsin.</p>
+              </div>
+              <div class="data-actions">
+                <button class="btn btn--ghost" type="button" id="exportButton">Dışa Aktar (JSON)</button>
+                <button class="btn btn--ghost" type="button" id="importButton">İçe Aktar</button>
+                <button class="btn btn--danger" type="button" id="resetButton">Tüm Verileri Sil</button>
+                <input type="file" id="importFile" accept="application/json,.json" hidden>
+              </div>
+              <p class="hint">Tüm veriler yalnızca bu tarayıcıda (<code>storage.local</code>) saklanır, hiçbir sunucuya gönderilmez.</p>
+            </div>
+          </details>
+        </form>
+
+        <footer class="save-bar">
+          <span class="save-bar__status" id="saveStatus">Tüm değişiklikler kaydedildi</span>
+          <button class="btn btn--primary" type="button" id="saveButton">Değişiklikleri Kaydet</button>
+        </footer>
+      </section>
+    </main>
+
+    <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+  </div>
+
+  <script src="../scripts/shared.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
