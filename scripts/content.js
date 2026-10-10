@@ -7,7 +7,7 @@
 (() => {
   'use strict';
 
-  const ENGINE_VERSION = '1.1.0';
+  const ENGINE_VERSION = '1.2.0';
   const extensionAPI = typeof browser !== 'undefined' ? browser : (typeof chrome !== 'undefined' ? chrome : null);
 
   if (globalThis.__ApplyPilotEngine && globalThis.__ApplyPilotEngine.version === ENGINE_VERSION) {
@@ -225,9 +225,9 @@
   const NAME_NEGATIVES = [/compan|\bsirket|\bfirma|\buser ?name|kullanici|\bfile\b|\bdosya|\bmiddle\b|\bnick|referen|referans|emergency|\bacil\b|\bschool|\bokul|universit|manager|yonetici|recruiter|employer|isveren|\bproject|\bproje|\bcard\b|\bkart\b|\bbank|\bfather|\bmother|\banne\b|\bbaba\b|spouse|business|domain|\bevent\b|\bdisplay\b/];
   const AMBIGUOUS_NAME = /^(your |candidate |applicant )?name$|^isim$|^isminiz$|^adi(niz)?$/;
 
-  const LINK_ACCEPTS = ['input', 'textarea'];
-  const SHORT_ACCEPTS = ['input', 'textarea', 'select', 'radio'];
-  const CHOICE_ACCEPTS = ['input', 'select', 'radio', 'checkbox'];
+  const LINK_ACCEPTS = ['input', 'textarea', 'combobox'];
+  const SHORT_ACCEPTS = ['input', 'textarea', 'select', 'radio', 'combobox'];
+  const CHOICE_ACCEPTS = ['input', 'select', 'radio', 'checkbox', 'combobox'];
   const LONG_ACCEPTS = ['textarea', 'editable'];
 
   const RULES = [
@@ -238,17 +238,17 @@
     },
     {
       key: 'phone', category: 'personal', accepts: ['input'], typeHint: 'tel', autocomplete: ['tel', 'tel-national'],
-      patterns: [/\bphone\b/, /telephone/, /\bmobile\b/, /\bcell\b/, /\btelefon/, /\btel\b/, /\bgsm\b/, /\bcep\b/, /\bcontact number\b/],
-      negatives: [/country code|ulke kodu|alan kodu|area code|dial code|\bext\b|extension|\bfax\b|\bfaks\b|emergency|\bacil\b|referen|referans/]
+      patterns: [/\bphone\b/, /telephone/, /\bmobile\b/, /\bcell\b/, /\btelefon/, /\btel\b/, /\bgsm\b/, /\bcep\b/, /\bcontact number\b/, /\bphone number\b/],
+      negatives: [/country code|ulke kodu|alan kodu|area code|\bext\b|extension|\bfax\b|\bfaks\b|emergency|\bacil\b|referen|referans/]
     },
     {
       key: 'firstName', category: 'personal', accepts: ['input'], autocomplete: ['given-name'],
-      patterns: [/\bfirst ?name\b/, /\bgiven ?name\b/, /\bfname\b/, /\bforename\b/, /^ad$/, /^adi(niz)?$/, /^isim$/, /^isminiz$/, /^first$/, /\bname first\b/],
+      patterns: [/\bfirst ?name\b/, /\bgiven ?name\b/, /\bfname\b/, /\bforename\b/, /\bfirstname\b/, /\bfirst_name\b/, /^ad$/, /^adi(niz)?$/, /^isim$/, /^isminiz$/, /^first$/, /\bname first\b/],
       negatives: NAME_NEGATIVES.concat(FULL_NAME_STRONG, [/\blast\b|\bsur ?name|\bsoyad|\bsoy ?isim|\bfamily/])
     },
     {
       key: 'lastName', category: 'personal', accepts: ['input'], autocomplete: ['family-name'],
-      patterns: [/\blast ?name\b/, /\bsur ?name\b/, /\bfamily ?name\b/, /\blname\b/, /\bsoyad/, /\bsoy ?isim/, /^last$/, /\bname last\b/],
+      patterns: [/\blast ?name\b/, /\bsur ?name\b/, /\bfamily ?name\b/, /\blname\b/, /\blastname\b/, /\blast_name\b/, /\bsoyad/, /\bsoy ?isim/, /^last$/, /\bname last\b/],
       negatives: NAME_NEGATIVES.concat(FULL_NAME_STRONG)
     },
     {
@@ -369,11 +369,11 @@
     },
     {
       key: 'country', category: 'personal', accepts: SHORT_ACCEPTS, autocomplete: ['country', 'country-name'],
-      patterns: [/\bcountry\b/, /\bulke/],
-      negatives: [/\bcode\b|\bkod|phone|telefon|\bdial|birth|dogum|citizenship|nationality|uyruk|vatandas|issu/]
+      patterns: [/\bcountry\b/, /\bulke/, /\bcountry of residence/, /\bresiden(ce|t) country/, /\bikamet (ettiginiz )?ulke/],
+      negatives: [/\bcountry code\b|\bulke kodu|phone|telefon|\bdial code|birth|dogum|citizenship|nationality|uyruk|vatandas/]
     },
     {
-      key: 'location', category: 'personal', accepts: ['input'],
+      key: 'location', category: 'personal', accepts: SHORT_ACCEPTS,
       patterns: [/\blocation\b/, /\bkonum/, /\blokasyon/, /\bwhere (are you|do you) (based|live|located|reside)/, /\bcurrent (location|city)/, /\bnerede yasiyor/, /\bresiden(ce|t)\b/, /\bikamet\b/, /\byasadiginiz yer/],
       negatives: [/preferred|tercih|desired|job location|is yeri|relocat|\btasin|office/]
     }
@@ -384,25 +384,37 @@
     return map;
   }, {});
 
-  const MIN_SCORE = 4;
+  const MIN_SCORE = 3;
 
   /* ------------------------------------------------------------------ */
   /* DOM discovery                                                       */
   /* ------------------------------------------------------------------ */
 
-  const CONTROL_SELECTOR = 'input, textarea, select, [contenteditable="true"], [contenteditable=""], [contenteditable="plaintext-only"]';
-  const TEXT_INPUT_TYPES = new Set(['text', 'email', 'tel', 'url', 'number', 'date', 'month']);
+  const CONTROL_SELECTOR = [
+    'input',
+    'textarea',
+    'select',
+    '[contenteditable="true"]',
+    '[contenteditable=""]',
+    '[contenteditable="plaintext-only"]',
+    '[role="textbox"]',
+    '[role="combobox"]',
+    '[role="searchbox"]',
+    '[aria-haspopup="listbox"]'
+  ].join(', ');
+  const TEXT_INPUT_TYPES = new Set(['text', 'email', 'tel', 'url', 'number', 'date', 'month', 'search']);
 
   function collectControls(root, output = []) {
     root.querySelectorAll(CONTROL_SELECTOR).forEach((el) => output.push(el));
     root.querySelectorAll('*').forEach((el) => {
       if (el.shadowRoot) collectControls(el.shadowRoot, output);
     });
-    return output;
+    return unique(output);
   }
 
   function getKind(el) {
     const tag = String(el.tagName).toLowerCase();
+    const role = String(el.getAttribute('role') || '').toLowerCase();
     if (tag === 'textarea') return 'textarea';
     if (tag === 'select') return 'select';
     if (tag === 'input') {
@@ -410,8 +422,11 @@
       if (type === 'radio') return 'radio';
       if (type === 'checkbox') return 'checkbox';
       if (type === 'file') return 'file';
-      return TEXT_INPUT_TYPES.has(type) ? 'input' : null;
+      if (role === 'combobox' || el.getAttribute('aria-haspopup') === 'listbox') return 'combobox';
+      return TEXT_INPUT_TYPES.has(type) || type === '' ? 'input' : null;
     }
+    if (role === 'combobox' || el.getAttribute('aria-haspopup') === 'listbox') return 'combobox';
+    if (role === 'textbox' || role === 'searchbox') return el.isContentEditable ? 'editable' : 'input';
     if (el.isContentEditable && !(el.parentElement && el.parentElement.isContentEditable)) return 'editable';
     return null;
   }
@@ -420,20 +435,27 @@
     if (!el || el.nodeType !== 1) return false;
     if (!el.getClientRects().length) return false;
     const style = getComputedStyle(el);
-    return style.visibility !== 'hidden' && style.visibility !== 'collapse';
+    return style.visibility !== 'hidden' && style.visibility !== 'collapse' && style.display !== 'none';
+  }
+
+  function isWidgetVisible(el) {
+    if (isVisible(el)) return true;
+    const widget = el.closest('label, [role="combobox"], [class*="input"], [class*="Input"], [class*="select"], [class*="Select"], [class*="field"], [class*="Field"], [class*="dropzone"], [class*="upload"]');
+    return Boolean(widget && widget !== el && isVisible(widget));
   }
 
   function isUsable(el, kind) {
     if (el.disabled) return false;
-    if ((kind === 'input' || kind === 'textarea') && el.readOnly) return false;
     const signature = `${el.getAttribute('name') || ''} ${el.id || ''} ${el.getAttribute('class') || ''}`.toLowerCase();
     if (/captcha|honeypot|\bhp_|bot.?field/.test(signature)) return false;
-    if (kind === 'radio' || kind === 'checkbox' || kind === 'file') {
-      return isVisible(el) || Array.from(el.labels || []).some(isVisible) || isVisible(el.parentElement);
+    if ((kind === 'input' || kind === 'textarea') && el.readOnly && kind !== 'combobox') {
+      if (!el.closest('[role="combobox"]') && el.getAttribute('aria-haspopup') !== 'listbox') return false;
     }
-    if (kind === 'select') return isVisible(el) || isVisible(el.parentElement);
-    if (el.getAttribute('aria-hidden') === 'true') return false;
-    return isVisible(el);
+    if (kind === 'radio' || kind === 'checkbox' || kind === 'file' || kind === 'select' || kind === 'combobox') {
+      return isWidgetVisible(el) || Array.from(el.labels || []).some(isVisible);
+    }
+    if (el.getAttribute('aria-hidden') === 'true' && !isWidgetVisible(el)) return false;
+    return isWidgetVisible(el);
   }
 
   function getRootOf(el) {
@@ -452,7 +474,7 @@
 
   function countControls(node) {
     if (!node || typeof node.querySelectorAll !== 'function') return 0;
-    return node.querySelectorAll('input:not([type="hidden"]), select, textarea').length;
+    return node.querySelectorAll('input:not([type="hidden"]), select, textarea, [role="combobox"], [role="textbox"]').length;
   }
 
   function getLabelText(el) {
@@ -481,6 +503,59 @@
     if (ariaLabel) parts.push(ariaLabel);
 
     return parts.join(' | ').slice(0, 400);
+  }
+
+  function shortText(value, max = 80) {
+    const text = String(value || '').replace(/\s+/g, ' ').trim();
+    return text && text.length <= max ? text : '';
+  }
+
+  /** Closest visual caption — prefers a short nearby label over a shared row heading. */
+  function getNearbyLabel(el) {
+    const official = getLabelText(el);
+    if (official && official.length <= 90 && !/\bfirst name\b.+\blast name\b/i.test(official) && !/\blast name\b.+\bfirst name\b/i.test(official)) {
+      return official;
+    }
+
+    const candidates = [];
+    const push = (value) => {
+      const text = shortText(value, 90);
+      if (text) candidates.push(text);
+    };
+
+    let node = el;
+    for (let depth = 0; depth < 5 && node && node !== document.body; depth += 1, node = node.parentElement) {
+      push(node.getAttribute && (node.getAttribute('data-label') || node.getAttribute('data-field-label') || node.getAttribute('data-placeholder')));
+    }
+
+    let sibling = el.previousElementSibling;
+    for (let i = 0; i < 4 && sibling; i += 1, sibling = sibling.previousElementSibling) {
+      if (countControls(sibling) > 0) break;
+      push(textOf(sibling, 90));
+      if (candidates.length) break;
+    }
+
+    const parent = el.parentElement;
+    if (parent) {
+      for (const child of Array.from(parent.children)) {
+        if (child === el || child.contains(el)) break;
+        if (countControls(child) > 0) continue;
+        const text = textOf(child, 90);
+        if (shortText(text, 70)) {
+          push(text);
+          break;
+        }
+      }
+      const labeled = parent.querySelector('label, legend, p, span, [class*="label" i], [class*="Label"]');
+      if (labeled && !labeled.contains(el)) push(textOf(labeled, 90));
+    }
+
+    if (official) candidates.unshift(official);
+    const uniqueCandidates = unique(candidates);
+    const specific = uniqueCandidates.find((text) =>
+      /first name|last name|e-?mail|phone|linkedin|country|resume|cv|soyad|telefon|ulke/i.test(text) && text.length <= 70
+    );
+    return specific || uniqueCandidates[0] || '';
   }
 
   function getDescribedByText(el) {
@@ -619,6 +694,7 @@
     };
 
     for (const el of controls) {
+      if (controls.some((other) => other !== el && el.contains(other))) continue;
       const kind = getKind(el);
       if (!kind || !isUsable(el, kind)) continue;
 
@@ -652,6 +728,9 @@
       el.getAttribute('data-testid'),
       el.getAttribute('data-qa'),
       el.getAttribute('data-test'),
+      el.getAttribute('data-cy'),
+      el.getAttribute('data-field'),
+      el.getAttribute('data-name'),
       el.getAttribute('formcontrolname'),
       el.getAttribute('ng-model'),
       el.getAttribute('v-model')
@@ -662,14 +741,14 @@
     let context = '';
 
     if (unit.kind === 'radio' || unit.kind === 'checkboxGroup') {
-      label = unit.question || '';
+      label = unit.question || getNearbyLabel(el);
       if (!label) context = getContextText(unit.highlightTarget || el);
     } else {
-      label = getLabelText(el);
+      label = getNearbyLabel(el);
       placeholder = [el.getAttribute('placeholder'), el.getAttribute('title'), el.getAttribute('data-placeholder'), getDescribedByText(el)]
         .filter(Boolean)
         .join(' ');
-      if (!label) context = getContextText(el);
+      context = getContextText(el);
     }
 
     const autocomplete = String(el.getAttribute('autocomplete') || '').toLowerCase();
@@ -694,16 +773,16 @@
       return 100;
     }
 
-    const sources = desc.label
-      ? [desc.label, desc.placeholder, desc.attrs]
-      : [desc.placeholder, desc.attrs, desc.context];
-    if (rule.negatives && sources.some((source) => testAny(rule.negatives, source))) return 0;
+    const primary = [desc.label, desc.placeholder].filter(Boolean).join(' ');
+    const secondary = [desc.attrs, desc.context].filter(Boolean).join(' ');
+    if (rule.negatives && primary && testAny(rule.negatives, primary) && !testAny(rule.patterns, primary)) return 0;
+    if (rule.negatives && !primary && testAny(rule.negatives, secondary) && !testAny(rule.patterns, secondary)) return 0;
 
     let score = 0;
     if (testAny(rule.patterns, desc.label)) score += 10;
     if (testAny(rule.patterns, desc.placeholder)) score += 6;
     if (testAny(rule.patterns, desc.attrs)) score += 5;
-    if (!desc.label && testAny(rule.patterns, desc.context)) score += 4;
+    if (testAny(rule.patterns, desc.context)) score += desc.label ? 2 : 4;
 
     if (rule.typeHint && unit.kind === 'input' && unit.el.type === rule.typeHint) {
       if (score > 0) score += 10;
@@ -731,6 +810,14 @@
           match.rule = RULE_BY_KEY.firstName;
         }
       }
+    }
+
+    // Shared row captions like "First name Last name" — left field is first, right is last.
+    const namePair = matches.filter((match) => /first name|given name|ad[iı]n[iı]z|soyad/i.test(`${match.desc.label} ${match.desc.context}`) && ['firstName', 'lastName', 'fullName'].includes(match.rule.key));
+    if (namePair.length === 2) {
+      namePair.sort((a, b) => a.unit.el.getBoundingClientRect().left - b.unit.el.getBoundingClientRect().left);
+      namePair[0].rule = RULE_BY_KEY.firstName;
+      namePair[1].rule = RULE_BY_KEY.lastName;
     }
 
     // Long texts (cover letter, summary …) go into a single best field only.
@@ -1338,11 +1425,55 @@
     return el.files && el.files.length ? 'filled' : 'failed';
   }
 
+  function findOpenListbox(el) {
+    const controls = el.getAttribute('aria-controls');
+    if (controls) {
+      const list = byId(el, controls.split(/\s+/)[0]);
+      if (list) return list;
+    }
+    const expanded = document.querySelector('[role="listbox"]');
+    return expanded || null;
+  }
+
+  function applyCombobox(unit, value) {
+    const el = unit.el;
+    focusSafely(el);
+    try { el.click(); } catch (_) { /* not clickable */ }
+
+    const input = el.tagName === 'INPUT' ? el : el.querySelector('input, textarea');
+    const text = value.text || (value.candidates && value.candidates[0]) || '';
+    if (input && text) setTextValue(input, formatForInput(input, value));
+    else if (text && el.isContentEditable) setEditableValue(el, text);
+
+    try {
+      (input || el).dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+    } catch (_) { /* ignore */ }
+
+    const list = findOpenListbox(el);
+    if (list) {
+      const options = Array.from(list.querySelectorAll('[role="option"], li')).map((option) =>
+        buildOption(option, textOf(option, 120) || option.textContent || '', option.getAttribute('data-value') || option.textContent || '')
+      );
+      const option = pickFromRanked(options, value);
+      if (option) {
+        try { option.el.click(); } catch (_) { /* ignore */ }
+        finishInteraction(el);
+        return 'filled';
+      }
+    }
+
+    if (input && String(input.value || '').trim()) return 'filled';
+    if (el.textContent && String(el.textContent).trim() && !/select|seçiniz|choose/i.test(el.textContent)) return 'filled';
+    return text ? 'filled' : 'nomatch';
+  }
+
   function applyValue(unit, value) {
     switch (unit.kind) {
       case 'input':
       case 'textarea':
         return setTextValue(unit.el, formatForInput(unit.el, value));
+      case 'combobox':
+        return applyCombobox(unit, value);
       case 'editable':
         return setEditableValue(unit.el, value.text);
       case 'file':
@@ -1393,9 +1524,11 @@
     const el = unit.el;
     switch (unit.kind) {
       case 'input':
-      case 'textarea': {
-        const current = String(el.value || '').trim();
-        return current !== '' && !/^(https?:\/\/(www\.)?|\+\d{0,3}|0)$/i.test(current);
+      case 'textarea':
+      case 'combobox': {
+        const input = el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' ? el : el.querySelector('input, textarea');
+        const current = String((input && input.value) || el.textContent || '').trim();
+        return current !== '' && !/^(https?:\/\/(www\.)?|\+\d{0,3}|0|select|select one|seçiniz|choose)$/i.test(current);
       }
       case 'editable':
         return String(el.textContent || '').trim() !== '';

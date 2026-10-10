@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>ApplyPilot ATS layout test</title>
+  <style>
+    body { font: 14px/1.4 system-ui; max-width: 720px; margin: 32px auto; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+    .field span { display: block; font-weight: 600; margin-bottom: 4px; }
+    input, [role="combobox"] { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 8px; }
+    [role="combobox"] { background: #fff; }
+  </style>
+</head>
+<body>
+  <h1>Application</h1>
+  <div class="row">
+    <div class="field">
+      <span>First name *</span>
+      <input>
+    </div>
+    <div class="field">
+      <span>Last name *</span>
+      <input>
+    </div>
+  </div>
+  <div class="field" style="margin-bottom:16px">
+    <span>Email *</span>
+    <input>
+  </div>
+  <div class="row">
+    <div class="field">
+      <span>Dial code</span>
+      <div role="combobox" aria-haspopup="listbox" tabindex="0">Select one</div>
+    </div>
+    <div class="field">
+      <span>Phone number</span>
+      <input>
+    </div>
+  </div>
+  <div class="field" style="margin-bottom:16px">
+    <span>LinkedIn profile</span>
+    <input>
+  </div>
+  <div class="field" style="margin-bottom:16px">
+    <span>Country of Residence *</span>
+    <div role="combobox" aria-haspopup="listbox" tabindex="0">Select one</div>
+  </div>
+  <p>Will you require visa sponsorship?</p>
+  <label><input type="radio" name="sponsor"> Yes</label>
+  <label><input type="radio" name="sponsor"> No</label>
+</body>
+</html>
