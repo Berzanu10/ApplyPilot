@@ -9,3 +9,12 @@ node_modules/
 Thumbs.db
 .vscode/
 .idea/
+
+# Personal profile / CV files — never commit real user data
+applypilot-profil-*.json
+*.pdf
+*.doc
+*.docx
+*.rtf
+*.odt
+chrome-storage/
