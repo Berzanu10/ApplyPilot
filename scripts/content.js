@@ -1,13 +1,13 @@
 /*
  * ApplyPilot — Content Script (form engine)
- * Injected on demand with scripting.executeScript (activeTab). It scans the page for
+ * Injected on demand into each frame the extension can reach. It scans the page for
  * form controls, matches them against the profile with heuristics and fills them in a
  * way that React / Vue / Angular state management picks up.
  */
 (() => {
   'use strict';
 
-  const ENGINE_VERSION = '1.2.1';
+  const ENGINE_VERSION = '1.3.0';
   const extensionAPI = typeof browser !== 'undefined' ? browser : (typeof chrome !== 'undefined' ? chrome : null);
 
   if (globalThis.__ApplyPilotEngine && globalThis.__ApplyPilotEngine.version === ENGINE_VERSION) {
@@ -225,44 +225,45 @@
   const NAME_NEGATIVES = [/compan|\bsirket|\bfirma|\buser ?name|kullanici|\bfile\b|\bdosya|\bmiddle\b|\bnick|referen|referans|emergency|\bacil\b|\bschool|\bokul|universit|manager|yonetici|recruiter|employer|isveren|\bproject|\bproje|\bcard\b|\bkart\b|\bbank|\bfather|\bmother|\banne\b|\bbaba\b|spouse|business|domain|\bevent\b|\bdisplay\b/];
   const AMBIGUOUS_NAME = /^(your |candidate |applicant )?name$|^isim$|^isminiz$|^adi(niz)?$/;
 
-  const LINK_ACCEPTS = ['input', 'textarea', 'combobox'];
-  const SHORT_ACCEPTS = ['input', 'textarea', 'select', 'radio', 'combobox'];
+  const LINK_ACCEPTS = ['input', 'textarea', 'combobox', 'editable'];
+  const TEXT_ACCEPTS = ['input', 'textarea', 'combobox', 'editable'];
+  const SHORT_ACCEPTS = ['input', 'textarea', 'select', 'radio', 'combobox', 'editable'];
   const CHOICE_ACCEPTS = ['input', 'select', 'radio', 'checkbox', 'combobox'];
   const LONG_ACCEPTS = ['textarea', 'editable'];
 
   const RULES = [
     {
-      key: 'email', category: 'personal', accepts: ['input', 'textarea'], typeHint: 'email', autocomplete: ['email'],
+      key: 'email', category: 'personal', accepts: TEXT_ACCEPTS, typeHint: 'email', autocomplete: ['email'],
       patterns: [/\be ?mail\b/, /\be ?posta\b/, /\beposta\b/, /\bmail\b/],
       negatives: [/referen|referans|\bmanager\b|yonetici|recruiter|referrer/]
     },
     {
-      key: 'phone', category: 'personal', accepts: ['input'], typeHint: 'tel', autocomplete: ['tel', 'tel-national'],
+      key: 'phone', category: 'personal', accepts: ['input', 'editable'], typeHint: 'tel', autocomplete: ['tel', 'tel-national'],
       patterns: [/\bphone\b/, /telephone/, /\bmobile\b/, /\bcell\b/, /\btelefon/, /\btel\b/, /\bgsm\b/, /\bcep\b/, /\bcontact number\b/, /\bphone number\b/],
       negatives: [/country code|ulke kodu|alan kodu|area code|\bext\b|extension|\bfax\b|\bfaks\b|emergency|\bacil\b|referen|referans/]
     },
     {
-      key: 'firstName', category: 'personal', accepts: ['input'], autocomplete: ['given-name'],
+      key: 'firstName', category: 'personal', accepts: TEXT_ACCEPTS, autocomplete: ['given-name'],
       patterns: [/\bfirst ?name\b/, /\bgiven ?name\b/, /\bfname\b/, /\bforename\b/, /\bfirstname\b/, /\bfirst_name\b/, /^ad$/, /^adi(niz)?$/, /^isim$/, /^isminiz$/, /^first$/, /\bname first\b/],
       negatives: NAME_NEGATIVES.concat(FULL_NAME_STRONG, [/\blast\b|\bsur ?name|\bsoyad|\bsoy ?isim|\bfamily/])
     },
     {
-      key: 'lastName', category: 'personal', accepts: ['input'], autocomplete: ['family-name'],
+      key: 'lastName', category: 'personal', accepts: TEXT_ACCEPTS, autocomplete: ['family-name'],
       patterns: [/\blast ?name\b/, /\bsur ?name\b/, /\bfamily ?name\b/, /\blname\b/, /\blastname\b/, /\blast_name\b/, /\bsoyad/, /\bsoy ?isim/, /^last$/, /\bname last\b/],
       negatives: NAME_NEGATIVES.concat(FULL_NAME_STRONG)
     },
     {
-      key: 'fullName', category: 'personal', accepts: ['input'], autocomplete: ['name'],
+      key: 'fullName', category: 'personal', accepts: TEXT_ACCEPTS, autocomplete: ['name'],
       patterns: FULL_NAME_STRONG.concat([/^(your |candidate |applicant )?name$/, /^isim$/, /^isminiz$/, /^adi(niz)?$/, /^aday adi$/]),
       negatives: NAME_NEGATIVES
     },
     {
-      key: 'birthDate', category: 'personal', accepts: ['input'], autocomplete: ['bday'],
+      key: 'birthDate', category: 'personal', accepts: ['input', 'editable'], autocomplete: ['bday'],
       patterns: [/\bbirth ?date\b/, /\bdate of birth\b/, /\bdob\b/, /\bbirthday\b/, /\bdogum ?tarih/, /\bdogum ?gunu/, /\bbirth\b/, /\bdogum\b/],
       negatives: [/place|\byer/, /\bcity\b|\bsehir|country|\bulke|\bil\b/]
     },
     {
-      key: 'postalCode', category: 'personal', accepts: ['input'], autocomplete: ['postal-code'],
+      key: 'postalCode', category: 'personal', accepts: ['input', 'editable'], autocomplete: ['postal-code'],
       patterns: [/\bpostal\b/, /\bzip\b/, /\bpost ?code\b/, /\bposta ?kodu/, /\bpostcode\b/]
     },
     { key: 'linkedin', category: 'links', accepts: LINK_ACCEPTS, patterns: [/\blinked ?in\b/] },
@@ -280,7 +281,7 @@
       negatives: [/linked ?in|git ?hub|kaggle|twitter|\bmedium\b|portfoli?o|portfolyo|compan|\bsirket|\bfirma|employer|isveren|job (post|ad|listing)|\bilan|video|youtube/]
     },
     {
-      key: 'salaryCurrency', category: 'salary', accepts: ['select', 'radio'],
+      key: 'salaryCurrency', category: 'salary', accepts: ['select', 'radio', 'combobox'],
       patterns: [/\bcurrency\b/, /\bpara birimi/, /\bdoviz\b/, /\bkur\b/]
     },
     {
@@ -294,7 +295,7 @@
       negatives: [/\bend date\b|\bbitis/]
     },
     {
-      key: 'workMode', category: 'preferences', accepts: ['input', 'select', 'radio', 'checkbox', 'checkboxGroup'],
+      key: 'workMode', category: 'preferences', accepts: ['input', 'select', 'radio', 'checkbox', 'checkboxGroup', 'combobox'],
       patterns: [/\bwork ?(mode|type|model|arrangement|style|setup|place type|location preference|preference)/, /\bworking (mode|model|arrangement|style)/, /\bworkplace (type|preference)/, /\bcalisma (modeli|sekli|tercihi|modu|bicimi|duzeni|ortami)/, /\bis modeli/, /\bremote\b/, /\buzaktan/, /\bhybrid\b/, /\bhibrit/, /\bon ?site\b/, /\bofisten/, /\bin office\b/],
       negatives: [/relocat|\btasin/]
     },
@@ -321,16 +322,16 @@
       patterns: [/\brelocat/, /\btasinma/, /\btasinabilir/, /\bsehir degistir/, /\byer degistir/]
     },
     {
-      key: 'yearsOfExperience', category: 'career', accepts: ['input', 'select', 'radio'],
+      key: 'yearsOfExperience', category: 'career', accepts: ['input', 'select', 'radio', 'combobox', 'editable'],
       patterns: [/\byears? of (professional |work |relevant |total |industry )?experience/, /\bexperience (in )?years/, /\btotal experience/, /\bhow many years/, /\bkac yil/, /\b(deneyim|tecrube) (suresi|yili)/, /\byil(lik)? (deneyim|tecrube)/, /\btoplam (deneyim|tecrube)/]
     },
     {
-      key: 'currentTitle', category: 'career', accepts: ['input'], autocomplete: ['organization-title'],
+      key: 'currentTitle', category: 'career', accepts: TEXT_ACCEPTS, autocomplete: ['organization-title'],
       patterns: [/\b(current|present|mevcut|guncel|su ?anki|son) (job )?(title|position|role|unvan|pozisyon|gorev)/, /\bjob title\b/, /\bunvan/, /\bis unvani/, /\bheadline\b/, /\boccupation\b/, /\bmeslek/, /^title$/, /^position$/, /^pozisyon$/],
       negatives: [/applying|\bbasvur|desired|istenen|\bhedef|\btarget|salutation|\bhitap|\bprefix\b|\bmr\b|compan|\bsirket|\bfirma/]
     },
     {
-      key: 'currentCompany', category: 'career', accepts: ['input'], autocomplete: ['organization'],
+      key: 'currentCompany', category: 'career', accepts: TEXT_ACCEPTS, autocomplete: ['organization'],
       patterns: [/\b(current|present|mevcut|su ?anki|son) (company|employer|sirket|firma|isveren|kurum|organi[sz]ation)/, /\bcompany( name)?$/, /\bemployer\b/, /\bcalistiginiz (sirket|firma|kurum)/, /\bsirket adi/, /\bfirma adi/],
       negatives: [/previous|onceki|former|referen|referans|website|\burl\b|address|\badres|phone|telefon|e ?mail|\bsize\b|sektor|industry/]
     },
@@ -358,7 +359,7 @@
       negatives: [/cover|on ?yazi|motivasyon|photo|foto|image|resim|portre|picture|avatar|headshot|kimlik|passport|id card|transcript|transkript/]
     },
     {
-      key: 'address', category: 'personal', accepts: ['input', 'textarea'], autocomplete: ['street-address', 'address-line1'],
+      key: 'address', category: 'personal', accepts: ['input', 'textarea', 'editable'], autocomplete: ['street-address', 'address-line1'],
       patterns: [/\baddress\b/, /\badres/, /\bstreet\b/, /\bsokak/, /\bmahalle/, /\bcadde/],
       negatives: [/e ?mail|e ?posta|\bmail\b|\bweb|\burl\b|\bip\b|line ?2|\bcity\b|\bsehir|country|\bulke|postal|\bzip\b|posta kodu|billing|fatura|company|\bsirket/]
     },
@@ -402,16 +403,42 @@
     '[role="searchbox"]',
     '[role="radio"]',
     '[role="checkbox"]',
+    '[role="spinbutton"]',
     '[aria-haspopup="listbox"]'
   ].join(', ');
   const TEXT_INPUT_TYPES = new Set(['text', 'email', 'tel', 'url', 'number', 'date', 'month', 'search']);
 
-  function collectControls(root, output = []) {
+  function collectControls(root, output = [], seen = new Set()) {
+    if (!root || typeof root.querySelectorAll !== 'function' || seen.has(root)) return output;
+    seen.add(root);
     root.querySelectorAll(CONTROL_SELECTOR).forEach((el) => output.push(el));
     root.querySelectorAll('*').forEach((el) => {
-      if (el.shadowRoot) collectControls(el.shadowRoot, output);
+      if (el.shadowRoot) collectControls(el.shadowRoot, output, seen);
     });
+    // Used only when a single top-frame injection has to see same-origin child frames.
+    // Cross-origin frames are separate injections and must not be walked from here.
+    if (globalThis.__ApplyPilotWalkFrames) {
+      root.querySelectorAll('iframe, frame').forEach((frame) => {
+        try {
+          if (frame.contentDocument) collectControls(frame.contentDocument, output, seen);
+        } catch (_) { /* cross-origin; filled from its own frame */ }
+      });
+    }
     return unique(output);
+  }
+
+  function queryDeep(selector, root = document) {
+    const found = [];
+    const visit = (node, seen = new Set()) => {
+      if (!node || typeof node.querySelectorAll !== 'function' || seen.has(node)) return;
+      seen.add(node);
+      node.querySelectorAll(selector).forEach((el) => found.push(el));
+      node.querySelectorAll('*').forEach((el) => {
+        if (el.shadowRoot) visit(el.shadowRoot, seen);
+      });
+    };
+    visit(root);
+    return found;
   }
 
   function getKind(el) {
@@ -430,7 +457,7 @@
     if (role === 'radio') return 'radio';
     if (role === 'checkbox') return 'checkbox';
     if (role === 'combobox' || el.getAttribute('aria-haspopup') === 'listbox') return 'combobox';
-    if (role === 'textbox' || role === 'searchbox') return el.isContentEditable ? 'editable' : 'input';
+    if (role === 'textbox' || role === 'searchbox' || role === 'spinbutton') return 'editable';
     if (el.isContentEditable && !(el.parentElement && el.parentElement.isContentEditable)) return 'editable';
     return null;
   }
@@ -779,6 +806,14 @@
         .filter(Boolean)
         .join(' ');
       context = getContextText(el);
+    }
+
+    if (!label) {
+      const root = el.getRootNode && el.getRootNode();
+      const host = root && root.host;
+      if (host && host !== el) {
+        label = getLabelText(host) || host.getAttribute('aria-label') || host.getAttribute('placeholder') || '';
+      }
     }
 
     const autocomplete = String(el.getAttribute('autocomplete') || '').toLowerCase();
@@ -1306,9 +1341,30 @@
   }
 
   function finishInteraction(el) {
-    fire(el, 'change');
-    fire(el, 'blur');
-    fire(el, 'focusout');
+    if (!askPage(el, 'blur')) {
+      fire(el, 'change');
+      fire(el, 'blur');
+      fire(el, 'focusout');
+    }
+  }
+
+  // The page bridge (installed in the page's own JS world) reads these attributes
+  // during the event and writes the value there, so React/Vue trackers update.
+  function askPage(el, kind, value) {
+    if (!el || typeof el.setAttribute !== 'function') return false;
+    try {
+      el.setAttribute('data-applypilot-kind', kind);
+      if (value !== undefined && value !== null) el.setAttribute('data-applypilot-value', String(value));
+      else el.removeAttribute('data-applypilot-value');
+      el.dispatchEvent(new Event('applypilot-commit', { bubbles: true, composed: true }));
+    } catch (_) {
+      return false;
+    }
+    const committed = el.getAttribute('data-applypilot-committed') === '1';
+    el.removeAttribute('data-applypilot-committed');
+    el.removeAttribute('data-applypilot-kind');
+    el.removeAttribute('data-applypilot-value');
+    return committed;
   }
 
   // Calling the prototype setter bypasses the instance-level setter React installs,
@@ -1321,60 +1377,90 @@
     else el.value = value;
   }
 
-  function setTextValue(el, text) {
+  function setTextValue(el, text, options) {
     if (!text) return 'nodata';
+    const keepFocus = Boolean(options && options.keepFocus);
+    const tag = String(el.tagName || '').toUpperCase();
+    if (tag !== 'INPUT' && tag !== 'TEXTAREA') return setEditableValue(el, text, options);
     focusSafely(el);
-    setNativeValue(el, text);
-    fire(el, 'input', text);
-    finishInteraction(el);
-    return el.value ? 'filled' : 'failed';
+    if (el.readOnly && el.getAttribute('aria-haspopup') !== 'listbox' && el.getAttribute('role') !== 'combobox') {
+      try { el.readOnly = false; } catch (_) { /* leave it locked */ }
+    }
+    const committed = askPage(el, keepFocus ? 'type' : 'text', text);
+    if (!committed) {
+      setNativeValue(el, text);
+      fire(el, 'input', text);
+      if (!keepFocus) fire(el, 'change');
+    }
+    if (!keepFocus) finishInteraction(el);
+    return String(el.value || '').trim() ? 'filled' : 'failed';
   }
 
-  function setEditableValue(el, text) {
+  function setEditableValue(el, text, options) {
     if (!text) return 'nodata';
+    const keepFocus = Boolean(options && options.keepFocus);
     focusSafely(el);
-    const doc = el.ownerDocument || document;
-    let inserted = false;
-    try {
-      const selection = doc.getSelection();
-      const range = doc.createRange();
-      range.selectNodeContents(el);
-      selection.removeAllRanges();
-      selection.addRange(range);
-      inserted = doc.execCommand('insertText', false, text);
-    } catch (_) {
-      inserted = false;
+    const committed = askPage(el, keepFocus ? 'type' : 'editable', text);
+    if (!committed) {
+      const doc = el.ownerDocument || document;
+      let inserted = false;
+      try {
+        const selection = doc.getSelection();
+        const range = doc.createRange();
+        range.selectNodeContents(el);
+        selection.removeAllRanges();
+        selection.addRange(range);
+        inserted = doc.execCommand('insertText', false, text);
+      } catch (_) {
+        inserted = false;
+      }
+      if (!inserted || !String(el.textContent || '').trim()) {
+        el.textContent = text;
+        fire(el, 'input', text);
+      }
     }
-    if (!inserted || !el.textContent.trim()) {
-      el.textContent = text;
-      fire(el, 'input', text);
-    }
-    finishInteraction(el);
-    return el.textContent.trim() ? 'filled' : 'failed';
+    if (!keepFocus) finishInteraction(el);
+    return String(el.textContent || '').trim() ? 'filled' : 'failed';
   }
 
   function setSelectValue(select, option) {
     focusSafely(select);
-    option.el.selected = true;
-    setNativeValue(select, option.value);
-    fire(select, 'input', null);
+    const committed = askPage(select, 'select', option.value);
+    if (!committed) {
+      option.el.selected = true;
+      setNativeValue(select, option.value);
+      fire(select, 'input', null);
+      fire(select, 'change');
+    }
     finishInteraction(select);
     return select.value === option.value ? 'filled' : 'failed';
   }
 
+  function isChecked(input) {
+    return Boolean(input.checked) || input.getAttribute('aria-checked') === 'true';
+  }
+
   function checkInput(input) {
-    if (input.checked) return 'filled';
-    input.click();
-    if (!input.checked) {
+    if (isChecked(input)) return 'filled';
+    const committed = askPage(input, 'check');
+    if (!committed) {
+      try { input.click(); } catch (_) { /* custom widget */ }
+    }
+    if (!isChecked(input)) {
       const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'checked');
       if (descriptor && descriptor.set) descriptor.set.call(input, true);
       else input.checked = true;
+      if (input.getAttribute('role') === 'radio' || input.getAttribute('role') === 'checkbox') {
+        input.setAttribute('aria-checked', 'true');
+      }
       fire(input, 'input', null);
       fire(input, 'change');
     }
-    fire(input, 'blur');
-    fire(input, 'focusout');
-    return input.checked ? 'filled' : 'failed';
+    if (!askPage(input, 'blur')) {
+      fire(input, 'blur');
+      fire(input, 'focusout');
+    }
+    return isChecked(input) ? 'filled' : 'failed';
   }
 
   function formatForInput(el, value) {
@@ -1450,54 +1536,71 @@
     } catch (_) {
       return 'failed';
     }
-    fire(el, 'input', null);
+    if (!askPage(el, 'change')) {
+      fire(el, 'input', null);
+      fire(el, 'change');
+    }
     finishInteraction(el);
     return el.files && el.files.length ? 'filled' : 'failed';
   }
 
   function findOpenListbox(el) {
-    const controls = el.getAttribute('aria-controls');
+    const controls = el.getAttribute('aria-controls') || el.getAttribute('aria-owns');
     if (controls) {
       const list = byId(el, controls.split(/\s+/)[0]);
       if (list) return list;
     }
-    const expanded = document.querySelector('[role="listbox"]');
-    return expanded || null;
+    const lists = queryDeep('[role="listbox"], [role="menu"]');
+    return lists.find((list) => list.getAttribute('aria-hidden') !== 'true' && !isEffectivelyHidden(list)) || null;
   }
 
-  function applyCombobox(unit, value) {
+  function delay(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  async function applyCombobox(unit, value) {
     const el = unit.el;
     focusSafely(el);
-    try { el.click(); } catch (_) { /* not clickable */ }
-
-    const input = el.tagName === 'INPUT' ? el : el.querySelector('input, textarea');
-    const text = value.text || (value.candidates && value.candidates[0]) || '';
-    if (input && text) setTextValue(input, formatForInput(input, value));
-    else if (text && el.isContentEditable) setEditableValue(el, text);
-
-    try {
-      (input || el).dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
-    } catch (_) { /* ignore */ }
-
-    const list = findOpenListbox(el);
-    if (list) {
-      const options = Array.from(list.querySelectorAll('[role="option"], li')).map((option) =>
-        buildOption(option, textOf(option, 120) || option.textContent || '', option.getAttribute('data-value') || option.textContent || '')
-      );
-      const option = pickFromRanked(options, value);
-      if (option) {
-        try { option.el.click(); } catch (_) { /* ignore */ }
-        finishInteraction(el);
-        return 'filled';
-      }
+    if (!askPage(el, 'click')) {
+      try { el.click(); } catch (_) { /* not clickable */ }
     }
 
+    const input = el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' ? el : el.querySelector('input, textarea');
+    const text = value.text || (value.candidates && value.candidates[0]) || '';
+    if (input && text) setTextValue(input, formatForInput(input, value), { keepFocus: true });
+    else if (text && (el.isContentEditable || el.getAttribute('role') === 'textbox')) setEditableValue(el, text, { keepFocus: true });
+
+    let option = null;
+    for (let attempt = 0; attempt < 6 && !option; attempt += 1) {
+      const list = findOpenListbox(el);
+      if (list) {
+        const options = Array.from(list.querySelectorAll('[role="option"], [role="menuitem"], li')).map((item) =>
+          buildOption(item, textOf(item, 120) || item.textContent || '', item.getAttribute('data-value') || item.textContent || '')
+        );
+        option = pickFromRanked(options, value);
+        if (option) break;
+      }
+      await delay(80);
+    }
+
+    if (option) {
+      if (!askPage(option.el, 'click')) {
+        try { option.el.click(); } catch (_) { /* ignore */ }
+      }
+      finishInteraction(el);
+      return 'filled';
+    }
+
+    try {
+      (input || el).dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true, composed: true }));
+    } catch (_) { /* ignore */ }
+
     if (input && String(input.value || '').trim()) return 'filled';
-    if (el.textContent && String(el.textContent).trim() && !/select|seçiniz|choose/i.test(el.textContent)) return 'filled';
+    if (el.textContent && String(el.textContent).trim() && !/select|seçiniz|seciniz|choose/i.test(el.textContent)) return 'filled';
     return text ? 'filled' : 'nomatch';
   }
 
-  function applyValue(unit, value) {
+  async function applyValue(unit, value) {
     switch (unit.kind) {
       case 'input':
       case 'textarea':
@@ -1519,7 +1622,10 @@
             }
           }
           if (any) {
-            fire(unit.el, 'input', null);
+            if (!askPage(unit.el, 'change')) {
+              fire(unit.el, 'input', null);
+              fire(unit.el, 'change');
+            }
             finishInteraction(unit.el);
             return 'filled';
           }
@@ -1680,21 +1786,44 @@
     return requested === 'tr' || requested === 'en' ? requested : detection.lang;
   }
 
-  function scan(request) {
-    const detection = detectLanguage();
-    const units = collectUnits();
-    const matches = matchUnits(units);
-    return {
-      ok: true,
-      language: resolveLanguage(request && request.language, detection),
-      detectedLanguage: detection.lang,
-      total: units.length,
-      matched: matches.length,
-      fields: unique(matches.map((match) => match.rule.key))
-    };
+  function looksLikePendingForm() {
+    if (!document.documentElement) return false;
+    const box = document.documentElement.getBoundingClientRect();
+    if (box.width < 48 || box.height < 48) return false;
+    if (!document.body || document.readyState !== 'complete') return true;
+    if (document.querySelector('[class*="application" i], [id*="application" i], [class*="basvuru" i], [id*="basvuru" i], [role="form"]')) return true;
+    const text = String(document.body.innerText || '').replace(/\s+/g, ' ').trim();
+    if (text.length < 40) return true;
+    return /loading|please wait|yukleniyor|application form|basvuru formu/i.test(text.slice(0, 500));
   }
 
-  function fill(request) {
+  async function collectUnitsWhenReady() {
+    let units = collectUnits();
+    if (units.length || !looksLikePendingForm()) return units;
+    const started = Date.now();
+    while (!units.length && Date.now() - started < 800) {
+      await delay(150);
+      units = collectUnits();
+    }
+    return units;
+  }
+
+  function scan(request) {
+    const detection = detectLanguage();
+    return collectUnitsWhenReady().then((units) => {
+      const matches = matchUnits(units);
+      return {
+        ok: true,
+        language: resolveLanguage(request && request.language, detection),
+        detectedLanguage: detection.lang,
+        total: units.length,
+        matched: matches.length,
+        fields: unique(matches.map((match) => match.rule.key))
+      };
+    });
+  }
+
+  async function fill(request) {
     const profile = (request && request.profile) || {};
     const settings = Object.assign(
       { categories: {}, overwriteExisting: false, highlightFields: true, fallbackToOtherLanguage: true },
@@ -1703,7 +1832,7 @@
     const detection = detectLanguage();
     const lang = resolveLanguage(request && request.language, detection);
 
-    const units = collectUnits();
+    const units = await collectUnitsWhenReady();
     const matches = matchUnits(units);
     const result = {
       ok: true,
@@ -1743,7 +1872,7 @@
 
       let status = 'failed';
       try {
-        status = applyValue(match.unit, value);
+        status = await applyValue(match.unit, value);
         touched = true;
       } catch (_) {
         status = 'failed';
@@ -1770,6 +1899,7 @@
   }
 
   function run(action, payload) {
+    globalThis.__ApplyPilotWalkFrames = Boolean(payload && payload.walkFrames);
     switch (action) {
       case 'scan':
         return scan(payload);
@@ -1795,7 +1925,12 @@
     extensionAPI.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       if (!message || message.source !== 'applypilot') return undefined;
       try {
-        sendResponse(globalThis.__ApplyPilotEngine.run(message.action, message.payload));
+        const output = globalThis.__ApplyPilotEngine.run(message.action, message.payload);
+        if (output && typeof output.then === 'function') {
+          output.then(sendResponse, (error) => sendResponse({ ok: false, error: String((error && error.message) || error) }));
+          return true;
+        }
+        sendResponse(output);
       } catch (error) {
         sendResponse({ ok: false, error: String((error && error.message) || error) });
       }

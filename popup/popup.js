@@ -124,7 +124,12 @@
   /* ------------------------------------------------------------------ */
 
   function bindHome() {
-    $('#fillButton').addEventListener('click', fillPage);
+    $('#fillButton').addEventListener('click', async () => {
+      try {
+        await Shared.ensureHostAccess();
+      } catch (_) { /* site-access prompt is unavailable here */ }
+      await fillPage();
+    });
 
     $('#openFullPage').addEventListener('click', async () => {
       await extensionAPI.runtime.openOptionsPage();
@@ -214,6 +219,11 @@
       const result = await Shared.runEngine(tab.id, 'scan', { language: state.fillLanguage });
       if (!result.ok) throw new Error(result.errors[0] || 'SCAN_FAILED');
 
+      if (result.total === 0 && result.blocked) {
+        setPageStatus('error', null, 'Form ayrı bir çerçevede. Eklentinin site erişimini onaylayıp sayfayı yeniledikten sonra tekrar deneyin.');
+        return;
+      }
+
       state.detectedLanguage = result.detectedLanguage;
       setLanguageChip(result.detectedLanguage);
       renderLanguageHint();
@@ -282,6 +292,11 @@
     if (summary.filled > 0) {
       box.dataset.variant = 'success';
       $('#resultTitle').textContent = `✓ ${summary.filled} alan dolduruldu`;
+    } else if (summary.total === 0 && summary.blocked) {
+      box.dataset.variant = 'error';
+      $('#resultTitle').textContent = 'Form çerçevesine erişilemedi';
+      $('#resultSub').textContent = 'Başvuru formu ayrı bir sayfada duruyor. Eklenti site iznini onaylayıp tekrar deneyin.';
+      return;
     } else {
       box.dataset.variant = 'info';
       $('#resultTitle').textContent = summary.total === 0

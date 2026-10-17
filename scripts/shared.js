@@ -475,6 +475,160 @@
   /* Engine injection                                                    */
   /* ------------------------------------------------------------------ */
 
+  const HOST_ORIGINS = { origins: ['http://*/*', 'https://*/*'] };
+
+  // Called from a click handler. Firefox only shows the site-access prompt from a user gesture.
+  function ensureHostAccess() {
+    const perms = extensionAPI.permissions;
+    if (!perms || typeof perms.request !== 'function') return Promise.resolve(false);
+    try {
+      return Promise.resolve(perms.request(HOST_ORIGINS)).catch(() => false);
+    } catch (_) {
+      return Promise.resolve(false);
+    }
+  }
+
+  // Serialized into the page's own JS world. Must stay self-contained.
+  function installPageBridge() {
+    const root = typeof window !== 'undefined' ? window : globalThis;
+    if (root.__applyPilotBridge) return;
+    root.__applyPilotBridge = true;
+
+    function nativeSet(el, value) {
+      const tag = String(el.tagName || '').toUpperCase();
+      const proto = tag === 'TEXTAREA'
+        ? root.HTMLTextAreaElement.prototype
+        : tag === 'SELECT'
+          ? root.HTMLSelectElement.prototype
+          : root.HTMLInputElement.prototype;
+      const protoDesc = Object.getOwnPropertyDescriptor(proto, 'value');
+      const ownDesc = Object.getOwnPropertyDescriptor(el, 'value');
+      const protoSetter = protoDesc && protoDesc.set;
+      const ownSetter = ownDesc && ownDesc.set;
+      const tracker = el._valueTracker;
+      if (tracker && typeof tracker.setValue === 'function') {
+        try { tracker.setValue(String(value) === '' ? ' ' : ''); } catch (_) { /* tracker is best-effort */ }
+      }
+      if (protoSetter && ownSetter && ownSetter !== protoSetter) protoSetter.call(el, value);
+      else if (protoSetter) protoSetter.call(el, value);
+      else el.value = value;
+    }
+
+    function emitInput(el, value) {
+      const data = value == null ? null : String(value);
+      try {
+        el.dispatchEvent(new root.InputEvent('beforeinput', {
+          bubbles: true, cancelable: true, composed: true, inputType: 'insertText', data
+        }));
+      } catch (_) { /* InputEvent can be unavailable */ }
+      try {
+        el.dispatchEvent(new root.InputEvent('input', {
+          bubbles: true, cancelable: true, composed: true, inputType: 'insertText', data
+        }));
+      } catch (_) {
+        el.dispatchEvent(new root.Event('input', { bubbles: true, composed: true }));
+      }
+      el.dispatchEvent(new root.Event('change', { bubbles: true, composed: true }));
+    }
+
+    function clickLikeUser(el) {
+      const opts = { bubbles: true, cancelable: true, composed: true, view: root };
+      try { el.dispatchEvent(new root.PointerEvent('pointerdown', opts)); } catch (_) { /* pointer events optional */ }
+      try { el.dispatchEvent(new root.MouseEvent('mousedown', opts)); } catch (_) { /* ignore */ }
+      try { el.dispatchEvent(new root.PointerEvent('pointerup', opts)); } catch (_) { /* ignore */ }
+      try { el.dispatchEvent(new root.MouseEvent('mouseup', opts)); } catch (_) { /* ignore */ }
+      try { el.click(); } catch (_) { /* not clickable */ }
+    }
+
+    root.document.addEventListener('applypilot-commit', (event) => {
+      const path = typeof event.composedPath === 'function' ? event.composedPath() : [];
+      const el = (path && path[0]) || event.target;
+      if (!el || typeof el.getAttribute !== 'function') return;
+      const kind = el.getAttribute('data-applypilot-kind');
+      if (!kind) return;
+      const value = el.getAttribute('data-applypilot-value') || '';
+      let ok = false;
+      try {
+        if (kind === 'text') {
+          try { el.focus(); } catch (_) { /* not focusable */ }
+          nativeSet(el, value);
+          emitInput(el, value);
+          if (String(el.value) !== String(value)) {
+            try {
+              el.focus();
+              if (typeof el.select === 'function') el.select();
+              root.document.execCommand('selectAll', false, null);
+              root.document.execCommand('insertText', false, value);
+            } catch (_) { /* execCommand can be disabled */ }
+          }
+          ok = String(el.value) === String(value) || String(el.value || '').length > 0;
+        } else if (kind === 'type') {
+          try { el.focus(); } catch (_) { /* not focusable */ }
+          if (el.isContentEditable) {
+            el.textContent = value;
+          } else {
+            nativeSet(el, value);
+          }
+          try {
+            el.dispatchEvent(new root.InputEvent('input', {
+              bubbles: true, cancelable: true, composed: true, inputType: 'insertText', data: value
+            }));
+          } catch (_) {
+            el.dispatchEvent(new root.Event('input', { bubbles: true, composed: true }));
+          }
+          ok = String((el.value || el.textContent) || '').length > 0;
+        } else if (kind === 'editable') {
+          try { el.focus(); } catch (_) { /* not focusable */ }
+          const selection = root.getSelection();
+          const range = root.document.createRange();
+          range.selectNodeContents(el);
+          if (selection) {
+            selection.removeAllRanges();
+            selection.addRange(range);
+          }
+          let inserted = false;
+          try { inserted = root.document.execCommand('insertText', false, value); } catch (_) { inserted = false; }
+          if (!inserted || !String(el.textContent || '').trim()) el.textContent = value;
+          emitInput(el, value);
+          ok = String(el.textContent || '').trim().length > 0;
+        } else if (kind === 'select') {
+          try { el.focus(); } catch (_) { /* not focusable */ }
+          nativeSet(el, value);
+          emitInput(el, value);
+          ok = String(el.value) === String(value);
+        } else if (kind === 'check') {
+          if (!el.checked && el.getAttribute('aria-checked') !== 'true') clickLikeUser(el);
+          if (!el.checked && el.getAttribute('aria-checked') !== 'true') {
+            const desc = Object.getOwnPropertyDescriptor(root.HTMLInputElement.prototype, 'checked');
+            if (desc && desc.set) desc.set.call(el, true);
+            else el.checked = true;
+            if (el.getAttribute('role') === 'radio' || el.getAttribute('role') === 'checkbox') {
+              el.setAttribute('aria-checked', 'true');
+            }
+            emitInput(el, null);
+          }
+          ok = Boolean(el.checked) || el.getAttribute('aria-checked') === 'true';
+        } else if (kind === 'click') {
+          try { el.focus(); } catch (_) { /* not focusable */ }
+          clickLikeUser(el);
+          ok = true;
+        } else if (kind === 'change') {
+          emitInput(el, null);
+          ok = true;
+        } else if (kind === 'blur') {
+          el.dispatchEvent(new root.Event('change', { bubbles: true, composed: true }));
+          try { el.dispatchEvent(new root.FocusEvent('blur', { bubbles: true, composed: true })); } catch (_) { /* ignore */ }
+          try { el.dispatchEvent(new root.FocusEvent('focusout', { bubbles: true, composed: true })); } catch (_) { /* ignore */ }
+          try { el.blur(); } catch (_) { /* ignore */ }
+          ok = true;
+        }
+      } catch (_) {
+        ok = false;
+      }
+      if (ok) el.setAttribute('data-applypilot-committed', '1');
+    }, true);
+  }
+
   // Serialized by scripting.executeScript, so it must stay self-contained.
   function invokeEngine(action, payload) {
     const engine = globalThis.__ApplyPilotEngine || (typeof window !== 'undefined' ? window.__ApplyPilotEngine : undefined);
@@ -488,14 +642,79 @@
     }
   }
 
-  async function executeEngine(tabId, action, payload, allFrames) {
-    const target = { tabId, allFrames };
+  function injectionErrorCode(error) {
+    const message = String((error && error.message) || error || '');
+    if (/cannot access|cannot be scripted|missing host permission|host permission|permission|denied|not allowed|error page|frame was removed|no frame|showing error/i.test(message)) {
+      return 'FRAME_BLOCKED';
+    }
+    return message || 'FRAME_BLOCKED';
+  }
+
+  function isOversizedPayload(error) {
+    return /clone|quota|message length|too large|max(?:imum)? size|serialized/i.test(String((error && error.message) || error || ''));
+  }
+
+  function isInjectableFrame(frame) {
+    if (!frame || frame.errorOccurred || typeof frame.frameId !== 'number') return false;
+    const url = String(frame.url || '');
+    if (!url || url === 'about:blank' || /^about:srcdoc/i.test(url) || /^blob:/i.test(url) || /^data:/i.test(url)) return true;
+    if (/^(chrome|chrome-untrusted|chrome-extension|chrome-search|edge|brave|opera|vivaldi|moz-extension|resource|devtools|view-source|about):/i.test(url)) return false;
+    return true;
+  }
+
+  async function listInjectableFrames(tabId) {
+    if (!extensionAPI.webNavigation || typeof extensionAPI.webNavigation.getAllFrames !== 'function') return null;
+    try {
+      const frames = await extensionAPI.webNavigation.getAllFrames({ tabId });
+      if (!frames || !frames.length) return null;
+      const injectable = frames.filter(isInjectableFrame);
+      return injectable.length ? injectable : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function payloadForTarget(target, payload) {
+    const topOnly = !target.allFrames && !target.frameIds;
+    if (!topOnly) return payload || {};
+    return Object.assign({}, payload || {}, { walkFrames: true });
+  }
+
+  async function executeOnTarget(target, action, payload) {
+    if (action === 'fill') {
+      try {
+        await extensionAPI.scripting.executeScript({
+          target,
+          world: 'MAIN',
+          func: installPageBridge
+        });
+      } catch (_) { /* page world is optional; isolated filling still runs */ }
+    }
     await extensionAPI.scripting.executeScript({ target, files: [CONTENT_SCRIPT] });
     return extensionAPI.scripting.executeScript({
       target,
       func: invokeEngine,
-      args: [action, payload || {}]
+      args: [action, payloadForTarget(target, payload)]
     });
+  }
+
+  async function executeEngineSafe(target, action, payload) {
+    try {
+      return await executeOnTarget(target, action, payload);
+    } catch (error) {
+      if (action === 'fill' && payload && payload.documents && isOversizedPayload(error)) {
+        try {
+          return await executeOnTarget(target, action, Object.assign({}, payload, { documents: {} }));
+        } catch (retryError) {
+          return [{ result: { ok: false, error: injectionErrorCode(retryError) } }];
+        }
+      }
+      return [{ result: { ok: false, error: injectionErrorCode(error) } }];
+    }
+  }
+
+  function delay(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   function aggregateResults(action, injectionResults) {
@@ -512,6 +731,7 @@
       language: null,
       detectedLanguage: null,
       frames: 0,
+      blocked: 0,
       errors: []
     };
     let bestWeight = -1;
@@ -522,6 +742,7 @@
       summary.frames += 1;
       if (!result.ok) {
         if (result.error) summary.errors.push(result.error);
+        if (result.error === 'FRAME_BLOCKED') summary.blocked += 1;
         continue;
       }
       summary.ok = true;
@@ -543,22 +764,62 @@
   }
 
   /**
-   * Injects the engine into every accessible frame of the tab and runs `action`.
-   * Cross-origin frames that activeTab cannot reach are skipped by the browser;
-   * if the multi-frame injection fails entirely we retry on the top frame only.
+   * Injects the engine into every frame of the tab and runs `action`.
+   * A single all-frames call is the fast path. Frames it skipped are retried
+   * one by one so one blocked iframe cannot cancel the rest.
    */
-  async function runEngine(tabId, action, payload) {
-    let results;
-    try {
-      results = await executeEngine(tabId, action, payload, true);
-    } catch (firstError) {
-      try {
-        results = await executeEngine(tabId, action, payload, false);
-      } catch (_) {
-        throw firstError;
+  async function runAcrossFrames(tabId, action, payload) {
+    const batched = await executeEngineSafe({ tabId, allFrames: true }, action, payload);
+    const results = Array.isArray(batched) ? batched.slice() : [];
+    const frames = await listInjectableFrames(tabId);
+    const seen = new Set(results.map((entry) => entry && entry.frameId).filter((id) => typeof id === 'number'));
+    const hasFrameIds = seen.size > 0;
+    const allFailed = !results.some((entry) => entry && entry.result && entry.result.ok);
+    const missing = (frames || []).filter((frame) => !seen.has(frame.frameId));
+    const retryFrames = !frames ? [] : (allFailed && !hasFrameIds ? frames : (hasFrameIds ? missing : []));
+
+    if (retryFrames.length) {
+      const extra = await Promise.all(retryFrames.map((frame) => (
+        executeEngineSafe({ tabId, frameIds: [frame.frameId] }, action, payload)
+      )));
+      for (const batch of extra) {
+        if (Array.isArray(batch)) results.push(...batch);
       }
     }
-    return aggregateResults(action, results);
+
+    const summary = aggregateResults(action, results);
+    if (summary.ok && (summary.total > 0 || summary.blocked === 0)) return summary;
+
+    const fallback = await executeEngineSafe({ tabId }, action, payload);
+    const fallbackSummary = aggregateResults(action, fallback);
+    if ((fallbackSummary.filled || 0) > 0 || (fallbackSummary.total || 0) > (summary.total || 0)) {
+      return fallbackSummary;
+    }
+    if (fallbackSummary.ok) {
+      fallbackSummary.blocked = (fallbackSummary.blocked || 0) + (summary.blocked || 0);
+      fallbackSummary.errors = (summary.errors || []).concat(fallbackSummary.errors || []);
+      return fallbackSummary;
+    }
+    return summary;
+  }
+
+  function preferSummary(current, next) {
+    if (!next) return current;
+    if ((next.filled || 0) > (current.filled || 0)) return next;
+    if ((next.total || 0) > (current.total || 0)) return next;
+    if (!current.ok && next.ok) return next;
+    return current;
+  }
+
+  async function runEngine(tabId, action, payload) {
+    let summary = await runAcrossFrames(tabId, action, payload);
+    const shouldRetry = (action === 'scan' || action === 'fill') && (summary.total || 0) === 0;
+    if (shouldRetry) {
+      await delay(summary.blocked ? 400 : 650);
+      const retry = await runAcrossFrames(tabId, action, payload);
+      summary = preferSummary(summary, retry);
+    }
+    return summary;
   }
 
   async function setBadge(tabId, text, color) {
@@ -588,7 +849,14 @@
   }
 
   function buildSummaryMessage(summary) {
+    const blocked = summary && summary.errors && summary.errors.indexOf('FRAME_BLOCKED') !== -1;
+    if (!summary.ok && blocked) {
+      return 'Başvuru formu ayrı bir çerçevede. Site erişimini onaylayıp tekrar deneyin.';
+    }
     if (!summary.ok) return 'Bu sayfada form doldurulamadı.';
+    if (summary.total === 0 && summary.blocked) {
+      return 'Başvuru çerçevesine erişilemedi. Site erişimini onaylayıp tekrar deneyin.';
+    }
     if (summary.filled === 0) {
       return summary.total === 0
         ? 'Bu sayfada doldurulabilir form alanı bulunamadı.'
@@ -624,13 +892,16 @@
 
   function describeError(error) {
     const message = String((error && error.message) || error || '');
+    if (/FRAME_BLOCKED/i.test(message)) {
+      return 'Başvuru formu ayrı bir çerçevede. Eklentinin site erişimini onaylayıp sayfayı yeniledikten sonra tekrar deneyin.';
+    }
     if (/cannot access|cannot be scripted|missing host permission|permission|gallery|privileged|denied|not allowed/i.test(message)) {
-      return 'Tarayıcı bu sayfaya erişime izin vermiyor. Sayfayı yenileyip eklenti simgesine tekrar tıklayın.';
+      return 'Tarayıcı bu sayfaya erişime izin vermiyor. Eklentiyi güncelledikten sonra site erişimini onaylayın.';
     }
     if (/no tab|invalid tab|tab.*not found|no frame/i.test(message)) {
       return 'Aktif sekme bulunamadı. Sayfayı yenileyip tekrar deneyin.';
     }
-    if (/ENGINE_UNAVAILABLE|NO_RESULT|frame/i.test(message)) {
+    if (/ENGINE_UNAVAILABLE|NO_RESULT/i.test(message)) {
       return 'Sayfa henüz hazır değil. Birkaç saniye sonra tekrar deneyin.';
     }
     return `Beklenmeyen bir hata oluştu: ${message}`;
@@ -671,6 +942,7 @@
     getActiveTab,
     isRestrictedUrl,
     getHostLabel,
+    ensureHostAccess,
     runEngine,
     fillTab,
     setBadge,

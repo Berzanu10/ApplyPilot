@@ -108,14 +108,14 @@ test/                    Örnek TR/EN formlar ve örnek profil
 
 **Cross-browser katmanı.** Tüm scriptler `const extensionAPI = typeof browser !== 'undefined' ? browser : chrome;` sarmalayıcısını kullanır ve yalnızca Promise tabanlı API'leri çağırır. `manifest.json` içinde hem `background.service_worker` (Chrome) hem `background.scripts` (Firefox/Zen) tanımlıdır; her tarayıcı kendi desteklediği anahtarı kullanır. Chrome'da `shared.js`, `importScripts` ile yüklenir.
 
-**Enjeksiyon.** Eklenti sürekli çalışan bir content script kullanmaz. `activeTab` + `scripting` izinleriyle, yalnızca sen popup'ı açtığında, kısayola bastığında veya sağ tık menüsünü kullandığında `content.js` sayfaya (ve erişilebilen tüm iframe'lere) enjekte edilir. Bu sayede geniş site izni (`<all_urls>`) gerekmez.
+**Enjeksiyon.** Eklenti sürekli çalışan bir content script kullanmaz. Yalnızca popup, kısayol veya sağ tık menüsü kullanıldığında `content.js` sekmeye enjekte edilir. Başvuru formları çoğu sitede ayrı bir iframe içinde durduğu için manifest `http://*/*` ve `https://*/*` erişimi ister; motor yine de kendiliğinden çalışmaz. Her çerçeve ayrı enjekte edilir, böylece bir çerçeveye erişilememesi diğerlerini durdurmaz.
 
-**Eşleştirme.** Her form kontrolü için etiket, placeholder, nitelik ve bağlam metinleri normalize edilip kural listesine karşı puanlanır (etiket 10, placeholder 6, nitelik 5, bağlam 4, uygun `type` bonusu, `autocomplete` eşleşmesi 100). Negatif kalıplar yanlış eşleşmeleri engeller: örneğin "Şirket adı" ad alanı, "Doğum yeri" doğum tarihi, "Referans e-postası" e-posta olarak görülmez.
+**Eşleştirme.** Her form kontrolü için etiket, placeholder, nitelik ve bağlam metinleri normalize edilip kural listesine karşı puanlanır (etiket 10, placeholder 6, nitelik 5, bağlam 4, uygun `type` bonusu, `autocomplete` eşleşmesi 100). Negatif kalıplar yanlış eşleşmeleri engeller: örneğin "Şirket adı" ad alanı, "Doğum yeri" doğum tarihi, "Referans e-postası" e-posta olarak görülmez. Değer, sayfanın kendi JavaScript ortamında yazılır; böylece React, Vue ve Angular state'i de güncellenir.
 
 ### Bilinen sınırlamalar
 
-- Workday gibi tamamen özel (div tabanlı) açılır menüler doldurulmaz. Gizli veya tamamen özel sürükle-bırak CV kutuları her sitede çalışmayabilir; klasik `input type="file"` alanları doldurulur.
-- Farklı origin'den gelen bazı iframe'lere `activeTab` izniyle erişilemeyebilir.
+- Workday gibi tamamen özel (div tabanlı) açılır menüler her sitede doldurulamayabilir. Gizli veya tamamen özel sürükle-bırak CV kutuları her sitede çalışmayabilir; klasik `input type="file"` alanları doldurulur.
+- `sandbox` ile komut dosyası çalıştırması kapatılmış iframe'lere tarayıcı erişim vermez.
 - Bazı siteler `isTrusted` kontrolü yaparak programatik olayları reddedebilir.
 
 ## Katkı
