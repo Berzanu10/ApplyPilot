@@ -1,7 +1,7 @@
 /*
  * ApplyPilot — Background
  * Chrome runs this file as a Manifest V3 service worker (background.service_worker) and
- * pulls in shared.js with importScripts. Firefox / Zen run it as an event page
+ * pulls in shared.js with importScripts.. Firefox / Zen run it as an event page
  * (background.scripts) where shared.js is already loaded before this file.
  */
 if (typeof importScripts === 'function' && typeof globalThis.ApplyPilotShared === 'undefined') {
